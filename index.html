@@ -74,6 +74,28 @@ button{font-family:inherit;}
 
 /* ---------- shell ---------- */
 #app{display:flex;flex-direction:column;height:100%;min-height:0;width:100%;max-width:480px;background:var(--bg);box-shadow:0 0 40px rgba(0,0,0,0.5);}
+
+/* On a wide screen (desktop), stop pretending to be a phone: use the extra
+   width instead of sitting in a narrow column with empty space either side.
+   Still capped (not full ultra-wide monitor width) and still centered — the
+   table/seats go left, the text/decision panel goes right, side by side. */
+@media (min-width:860px){
+  #app{max-width:1180px;}
+  #main-train{
+    display:grid;
+    grid-template-columns:1.15fr 0.9fr;
+    grid-template-areas:
+      "info info"
+      "table context"
+      "table feedback";
+    column-gap:22px;
+    align-items:start;
+  }
+  #main-train .infobar{grid-area:info;}
+  #main-train .table-wrap{grid-area:table;margin-bottom:0;aspect-ratio:1/0.92;}
+  #main-train .table-context{grid-area:context;margin-bottom:0;}
+  #main-train #feedback-slot{grid-area:feedback;}
+}
 [hidden]{display:none!important;}
 
 header{
@@ -104,12 +126,12 @@ nav.tabs button{
 }
 nav.tabs button.active{background:var(--accent-bg);border-color:var(--accent-strong);color:var(--accent);}
 
-main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 12px);}
+main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px);}
 
 /* ---------- scenario card ---------- */
 .infobar{
-  display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;
-  font-size:11.5px;color:var(--text-dim);margin-bottom:12px;
+  display:flex;flex-wrap:wrap;gap:5px 8px;align-items:center;
+  font-size:10.5px;color:var(--text-dim);margin-bottom:8px;
 }
 .infobar b{color:var(--text);font-weight:700;}
 .pill{
@@ -118,7 +140,7 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px
 }
 .pill.n{color:var(--gold);border-color:rgba(227,185,92,0.35);background:var(--gold-bg);}
 
-.table-wrap{position:relative;width:100%;aspect-ratio:1/0.92;margin:2px 0 18px;}
+.table-wrap{position:relative;width:100%;aspect-ratio:1/0.78;margin:0 0 10px;}
 .felt{
   position:absolute;left:8%;right:8%;top:9%;bottom:9%;border-radius:50%;
   background:radial-gradient(ellipse at 50% 32%, #1f6a4b 0%, #124030 62%, #0d3226 100%);
@@ -137,15 +159,15 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px
 .pot-center .n{font-size:10.5px;color:var(--gold);margin-top:4px;letter-spacing:0.03em;}
 
 .seat{
-  position:absolute;transform:translate(-50%,-50%);width:25%;min-width:74px;max-width:98px;
-  background:var(--surface);border:1px solid var(--border);border-radius:12px;
-  padding:7px 8px;text-align:center;
+  position:absolute;transform:translate(-50%,-50%);width:25%;min-width:66px;max-width:92px;
+  background:var(--surface);border:1px solid var(--border);border-radius:11px;
+  padding:5px 6px;text-align:center;
   box-shadow:0 4px 10px rgba(0,0,0,0.35);
 }
-.seat .pos{font-size:10.5px;font-weight:800;letter-spacing:0.04em;color:var(--text-faint);}
-.seat .stack{font-family:var(--font-mono);font-size:13.5px;font-weight:600;margin-top:3px;}
-.seat .chips{font-size:9.5px;color:var(--text-faint);}
-.seat .posted{font-size:8.5px;color:var(--gold);margin-top:3px;line-height:1.3;}
+.seat .pos{font-size:9.5px;font-weight:800;letter-spacing:0.04em;color:var(--text-faint);}
+.seat .stack{font-family:var(--font-mono);font-size:12.5px;font-weight:600;margin-top:2px;}
+.seat .chips{font-size:8.5px;color:var(--text-faint);}
+.seat .posted{font-size:7.5px;color:var(--gold);margin-top:2px;line-height:1.25;}
 .seat.hero{border-color:var(--accent-strong);background:var(--accent-bg);z-index:2;}
 .seat.hero .pos{color:var(--accent);}
 .seat.villain{border-color:var(--gold);background:var(--gold-bg);z-index:2;}
@@ -164,14 +186,14 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px
   display:flex;gap:4px;margin-bottom:14px;z-index:3;
 }
 .seat-cards .card{
-  width:34px;height:47px;border-radius:5px;box-shadow:0 3px 8px rgba(0,0,0,0.45);
+  width:28px;height:39px;border-radius:5px;box-shadow:0 3px 8px rgba(0,0,0,0.45);
 }
-.seat-cards .card .r{font-size:14px;}
-.seat-cards .card .s{font-size:11px;margin-top:0;}
+.seat-cards .card .r{font-size:12px;}
+.seat-cards .card .s{font-size:9.5px;margin-top:0;}
 
 .table-context{
-  background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  padding:14px;margin-bottom:16px;display:flex;flex-direction:column;gap:12px;
+  background:var(--surface);border:1px solid var(--border);border-radius:13px;
+  padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;
 }
 .hand-row{display:flex;align-items:center;gap:14px;}
 .cards{display:flex;gap:6px;}
@@ -189,13 +211,13 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px
 .hand-desc b{color:var(--text);}
 
 .situation{
-  font-size:13.5px;line-height:1.55;color:var(--text);
-  background:var(--surface-2);border-radius:10px;padding:10px 12px;
+  font-size:12.5px;line-height:1.45;color:var(--text);
+  background:var(--surface-2);border-radius:9px;padding:8px 10px;
 }
 .situation .muted{color:var(--text-dim);}
 .risk-callout{
-  margin-top:8px;padding:7px 10px;border-radius:8px;background:var(--gold-bg);
-  border:1px solid rgba(227,185,92,0.3);color:var(--text);font-size:12.5px;
+  margin-top:6px;padding:6px 9px;border-radius:8px;background:var(--gold-bg);
+  border:1px solid rgba(227,185,92,0.3);color:var(--text);font-size:11.5px;
 }
 
 /* ---------- action bar ---------- */
@@ -217,7 +239,7 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px
 
 /* ---------- feedback ---------- */
 .feedback{
-  border-radius:14px;padding:14px;margin-bottom:16px;border:1px solid var(--border);background:var(--surface);
+  border-radius:13px;padding:11px;margin-bottom:10px;border:1px solid var(--border);background:var(--surface);
 }
 .feedback.correct{border-color:var(--accent-strong);}
 .feedback.wrong{border-color:var(--danger);}
@@ -2098,9 +2120,9 @@ $('#info-modal').addEventListener('click', (e)=>{ if(e.target.id==='info-modal')
 </script>
 
 <script>
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(() => {});
     });
   }
 </script>
