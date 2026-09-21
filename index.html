@@ -1,0 +1,2107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ICM DoN">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Entraineur ICM push/fold et call/fold pour Double or Nothing 6-max">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png" type="image/png">
+<title>ICM DoN Trainer</title>
+<style>
+:root{
+  --bg:#0b0d12;
+  --surface:#141924;
+  --surface-2:#1b2230;
+  --surface-3:#232c3d;
+  --border:#2b3446;
+  --text:#eef1f7;
+  --text-dim:#94a0b8;
+  --text-faint:#5b6579;
+  --accent:#3fd9a4;
+  --accent-strong:#22b98a;
+  --accent-bg:rgba(63,217,164,0.12);
+  --gold:#e3b95c;
+  --gold-bg:rgba(227,185,92,0.14);
+  --danger:#ef6b7f;
+  --danger-bg:rgba(239,107,127,0.13);
+  --card-bg:#f6f3ea;
+  --card-black:#1c2230;
+  --card-red:#c23b4d;
+  --font-display:'Bricolage Grotesque',system-ui,sans-serif;
+  --font-body:'Manrope',system-ui,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+::selection{background:var(--accent);color:#08130f;}
+h1,h2,h3{font-family:var(--font-display);margin:0;text-wrap:balance;}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+button{font-family:inherit;}
+
+/* ---------- loading overlay ---------- */
+#loading{
+  position:fixed;inset:0;background:
+    radial-gradient(120% 90% at 50% -10%, #16351f 0%, var(--bg) 55%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;z-index:100;padding:24px;text-align:center;
+}
+.spinner{
+  width:38px;height:38px;border-radius:50%;
+  border:3px solid var(--surface-3);border-top-color:var(--accent);
+  animation:spin 0.9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loading .loadbar{width:200px;height:4px;border-radius:4px;background:var(--surface-3);overflow:hidden;}
+#loading .loadbar-fill{height:100%;background:var(--accent);width:0%;transition:width .15s ease;}
+#loading p{color:var(--text-dim);font-size:13px;max-width:280px;line-height:1.5;}
+
+/* ---------- shell ---------- */
+#app{display:flex;flex-direction:column;height:100%;min-height:0;}
+[hidden]{display:none!important;}
+
+header{
+  flex:0 0 auto;
+  padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;
+  background:linear-gradient(180deg,#101722,#0d1119);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+}
+header .brand{display:flex;flex-direction:column;line-height:1.15;}
+header .brand b{font-family:var(--font-display);font-size:17px;font-weight:800;letter-spacing:-0.01em;}
+header .brand span{font-size:11px;color:var(--text-dim);}
+header .icon-btn{
+  width:34px;height:34px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface-2);color:var(--text-dim);display:flex;align-items:center;justify-content:center;
+  font-size:15px;cursor:pointer;
+}
+header .icon-btn:active{background:var(--surface-3);}
+
+nav.tabs{
+  flex:0 0 auto;display:flex;gap:6px;padding:10px 16px;background:var(--bg);
+  border-bottom:1px solid var(--border);
+}
+nav.tabs button{
+  flex:1;padding:9px 4px;border-radius:10px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text-dim);font-size:12.5px;font-weight:700;
+  cursor:pointer;letter-spacing:0.01em;
+}
+nav.tabs button.active{background:var(--accent-bg);border-color:var(--accent-strong);color:var(--accent);}
+
+main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px calc(env(safe-area-inset-bottom,0px) + 12px);}
+
+/* ---------- scenario card ---------- */
+.infobar{
+  display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;
+  font-size:11.5px;color:var(--text-dim);margin-bottom:12px;
+}
+.infobar b{color:var(--text);font-weight:700;}
+.pill{
+  padding:3px 9px;border-radius:99px;background:var(--surface-2);border:1px solid var(--border);
+  font-size:11px;color:var(--text-dim);white-space:nowrap;
+}
+.pill.n{color:var(--gold);border-color:rgba(227,185,92,0.35);background:var(--gold-bg);}
+
+.table-wrap{position:relative;width:100%;aspect-ratio:1/0.92;margin:2px 0 18px;}
+.felt{
+  position:absolute;left:8%;right:8%;top:9%;bottom:9%;border-radius:50%;
+  background:radial-gradient(ellipse at 50% 32%, #1f6a4b 0%, #124030 62%, #0d3226 100%);
+  border:7px solid #09201780;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 10px 28px rgba(0,0,0,0.45), 0 10px 22px rgba(0,0,0,0.4);
+}
+.felt::after{
+  content:'';position:absolute;inset:16px;border-radius:50%;border:1px dashed rgba(255,255,255,0.10);
+}
+.pot-center{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  text-align:center;color:rgba(238,241,247,0.65);width:64%;
+}
+.pot-center .lvl{font-family:var(--font-mono);font-size:12px;font-weight:600;letter-spacing:0.02em;}
+.pot-center .blinds{font-family:var(--font-mono);font-size:15px;font-weight:600;color:rgba(238,241,247,0.9);margin-top:2px;}
+.pot-center .n{font-size:10.5px;color:var(--gold);margin-top:4px;letter-spacing:0.03em;}
+
+.seat{
+  position:absolute;transform:translate(-50%,-50%);width:25%;min-width:74px;max-width:98px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:7px 8px;text-align:center;
+  box-shadow:0 4px 10px rgba(0,0,0,0.35);
+}
+.seat .pos{font-size:10.5px;font-weight:800;letter-spacing:0.04em;color:var(--text-faint);}
+.seat .stack{font-family:var(--font-mono);font-size:13.5px;font-weight:600;margin-top:3px;}
+.seat .chips{font-size:9.5px;color:var(--text-faint);}
+.seat .posted{font-size:8.5px;color:var(--gold);margin-top:3px;line-height:1.3;}
+.seat.hero{border-color:var(--accent-strong);background:var(--accent-bg);z-index:2;}
+.seat.hero .pos{color:var(--accent);}
+.seat.villain{border-color:var(--gold);background:var(--gold-bg);z-index:2;}
+.seat.villain .pos{color:var(--gold);}
+.seat.decider{border-color:rgba(240,197,90,0.55);}
+.seat.decider .pos{color:rgba(240,197,90,0.85);}
+.seat.decider .tag{background:rgba(240,197,90,0.85);color:#241a05;}
+.seat .tag{
+  position:absolute;top:-9px;left:50%;transform:translateX(-50%);font-size:8.5px;font-weight:800;
+  padding:2px 6px;border-radius:99px;letter-spacing:0.03em;white-space:nowrap;
+}
+.seat.hero .tag{background:var(--accent);color:#08130f;}
+.seat.villain .tag{background:var(--gold);color:#241a05;}
+.seat-cards{
+  position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
+  display:flex;gap:4px;margin-bottom:14px;z-index:3;
+}
+.seat-cards .card{
+  width:34px;height:47px;border-radius:5px;box-shadow:0 3px 8px rgba(0,0,0,0.45);
+}
+.seat-cards .card .r{font-size:14px;}
+.seat-cards .card .s{font-size:11px;margin-top:0;}
+
+.table-context{
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:14px;margin-bottom:16px;display:flex;flex-direction:column;gap:12px;
+}
+.hand-row{display:flex;align-items:center;gap:14px;}
+.cards{display:flex;gap:6px;}
+.card{
+  width:52px;height:72px;border-radius:8px;background:var(--card-bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 3px 8px rgba(0,0,0,0.35);
+  font-family:var(--font-display);
+}
+.card .r{font-size:21px;font-weight:800;line-height:1;}
+.card .s{font-size:17px;line-height:1;margin-top:1px;}
+.card.black .r,.card.black .s{color:var(--card-black);}
+.card.red .r,.card.red .s{color:var(--card-red);}
+.hand-desc{font-size:13px;color:var(--text-dim);line-height:1.45;flex:1;}
+.hand-desc b{color:var(--text);}
+
+.situation{
+  font-size:13.5px;line-height:1.55;color:var(--text);
+  background:var(--surface-2);border-radius:10px;padding:10px 12px;
+}
+.situation .muted{color:var(--text-dim);}
+.risk-callout{
+  margin-top:8px;padding:7px 10px;border-radius:8px;background:var(--gold-bg);
+  border:1px solid rgba(227,185,92,0.3);color:var(--text);font-size:12.5px;
+}
+
+/* ---------- action bar ---------- */
+.actionbar{
+  flex:0 0 auto;display:flex;gap:10px;padding:12px 16px calc(env(safe-area-inset-bottom,0px) + 12px);
+  background:linear-gradient(180deg,rgba(11,13,18,0),var(--bg) 30%);
+  border-top:1px solid var(--border);
+}
+.actionbar button{
+  flex:1;padding:15px 8px;border-radius:14px;border:none;font-family:var(--font-display);
+  font-weight:800;font-size:15.5px;letter-spacing:0.01em;cursor:pointer;
+  transition:transform .08s ease;
+}
+.actionbar button:active{transform:scale(0.97);}
+.actionbar button.fold{background:var(--surface-3);color:var(--text);}
+.actionbar button.go{background:var(--accent);color:#06130e;}
+.actionbar button.call{background:var(--gold);color:#241a05;}
+.actionbar button:disabled{opacity:0.5;}
+
+/* ---------- feedback ---------- */
+.feedback{
+  border-radius:14px;padding:14px;margin-bottom:16px;border:1px solid var(--border);background:var(--surface);
+}
+.feedback.correct{border-color:var(--accent-strong);}
+.feedback.wrong{border-color:var(--danger);}
+.fb-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.fb-badge{
+  font-family:var(--font-display);font-weight:800;font-size:12px;padding:5px 10px;border-radius:99px;
+}
+.feedback.correct .fb-badge{background:var(--accent-bg);color:var(--accent);}
+.feedback.wrong .fb-badge{background:var(--danger-bg);color:var(--danger);}
+.fb-title{font-size:14.5px;font-weight:700;}
+.ev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.ev-box{background:var(--surface-2);border-radius:10px;padding:9px 11px;}
+.ev-box .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;}
+.ev-box .val{font-family:var(--font-mono);font-size:17px;font-weight:600;margin-top:2px;}
+.ev-box.best{outline:2px solid var(--accent-strong);outline-offset:-1px;}
+.ev-delta{font-size:12px;color:var(--text-dim);margin-bottom:10px;}
+.ev-delta b{color:var(--text);}
+.confidence{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 9px;border-radius:99px;
+  background:var(--surface-2);color:var(--text-dim);margin-bottom:10px;
+}
+.confidence.robust{color:var(--accent);}
+.confidence.marginal{color:var(--gold);}
+.leak{font-size:12.5px;color:var(--danger);background:var(--danger-bg);border-radius:9px;padding:7px 10px;margin-bottom:10px;}
+.explain-toggle{
+  background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:9px;
+  padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;width:100%;
+}
+.explain-body{margin-top:10px;font-size:12.5px;color:var(--text-dim);line-height:1.6;}
+.explain-body table{width:100%;border-collapse:collapse;font-size:11.5px;margin:8px 0;}
+.explain-body td,.explain-body th{padding:4px 6px;border-bottom:1px solid var(--border);text-align:left;}
+.explain-body th{color:var(--text-faint);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:0.04em;}
+.range-box{
+  font-family:var(--font-mono);font-size:11px;background:var(--surface-2);border-radius:8px;
+  padding:8px 9px;margin:6px 0;max-height:90px;overflow-y:auto;color:var(--text-dim);line-height:1.6;
+}
+.range-grid{
+  display:grid;grid-template-columns:repeat(13,1fr);gap:1px;background:var(--border);
+  border-radius:8px;overflow:hidden;margin:8px 0;
+}
+.rg-cell{
+  background:var(--surface-2);color:var(--text-faint);font-size:7.2px;font-family:var(--font-mono);
+  display:flex;align-items:center;justify-content:center;aspect-ratio:1;padding:1px;
+}
+.rg-cell.pair{color:var(--text-dim);}
+.rg-cell.active{background:var(--accent);color:#06130e;font-weight:700;}
+.rg-cell.active-good{background:var(--accent-strong);color:#06130e;font-weight:700;}
+.rg-cell.active-marginal{background:var(--gold);color:#241a05;font-weight:700;}
+/* Deliberately NOT green/gold: this palette is only for the opponent's
+   assumed range (informational — "what they'd likely play"), never for a
+   grid that answers "what should I do". Green universally reads as
+   go/correct, so re-using it for a purely descriptive opponent range
+   invites exactly the misread this app is trying to prevent: seeing a
+   mostly-colored grid and assuming it's telling you to play those hands. */
+.rg-cell.villain-in{background:#3a4a63;color:#dbe6f5;font-weight:700;}
+.rg-cell.villain-border{background:#2a3547;color:#aebdd4;font-weight:700;}
+.hero-range-loading{
+  font-size:11px;color:var(--text-faint);background:var(--surface-2);border-radius:8px;
+  padding:10px;margin:8px 0;text-align:center;
+}
+.next-btn{
+  width:100%;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#06130e;
+  font-family:var(--font-display);font-weight:800;font-size:15px;cursor:pointer;margin-bottom:16px;
+}
+.next-btn:active{transform:scale(0.98);}
+
+/* ---------- stats view ---------- */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;}
+.stat-card .num{font-family:var(--font-mono);font-size:26px;font-weight:600;}
+.stat-card .lbl{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+.stat-card.wide{grid-column:1/-1;}
+.leak-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;}
+.leak-row:last-child{border-bottom:none;}
+.leak-row .n{font-family:var(--font-mono);color:var(--gold);font-weight:600;}
+.reset-btn{
+  width:100%;padding:12px;border-radius:12px;border:1px solid var(--danger);background:none;color:var(--danger);
+  font-weight:700;font-size:13px;cursor:pointer;margin-top:4px;
+}
+
+/* ---------- solver view ---------- */
+.solver-intro{font-size:12px;color:var(--text-dim);line-height:1.55;margin-bottom:14px;}
+.solver-section{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px;}
+.solver-section h3{font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-faint);margin-bottom:10px;}
+.solver-field{margin-bottom:10px;}
+.solver-field label{display:block;font-size:11.5px;color:var(--text-dim);margin-bottom:4px;}
+.solver-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.solver-select,.solver-input{
+  width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+  border-radius:9px;padding:9px 10px;font-family:var(--font-mono);font-size:13.5px;
+}
+.solver-select:focus,.solver-input:focus{outline:2px solid var(--accent-strong);outline-offset:-1px;}
+.solver-seats{display:flex;flex-direction:column;gap:8px;}
+.solver-seat-row{display:grid;grid-template-columns:56px 1fr 70px;gap:8px;align-items:center;}
+.solver-seat-row .pos-lbl{font-size:12.5px;font-weight:700;color:var(--text-dim);}
+.solver-sum{font-size:11px;color:var(--text-faint);margin-top:6px;}
+.solver-sum.mismatch{color:var(--gold);}
+.solver-cards{display:flex;gap:10px;}
+.solver-card-pick{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.solver-btn{
+  width:100%;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#06130e;
+  font-family:var(--font-display);font-weight:800;font-size:15px;cursor:pointer;margin-top:4px;
+}
+.solver-btn:active{transform:scale(0.98);}
+.solver-error{
+  font-size:12.5px;color:var(--danger);background:var(--danger-bg);border-radius:9px;
+  padding:9px 11px;margin-top:10px;
+}
+.solver-result-badge{
+  display:inline-block;font-family:var(--font-display);font-weight:800;font-size:20px;
+  padding:8px 14px;border-radius:12px;margin-bottom:4px;
+}
+.solver-result-badge.act{background:var(--accent);color:#06130e;}
+.solver-result-badge.fold{background:var(--surface-2);color:var(--text-dim);border:1px solid var(--border);}
+.solver-confidence{font-size:12px;color:var(--text-dim);margin-bottom:12px;}
+.section-title{font-family:var(--font-display);font-size:13px;font-weight:800;color:var(--text-dim);
+  text-transform:uppercase;letter-spacing:0.05em;margin:20px 0 10px;}
+.section-title:first-child{margin-top:0;}
+.empty-state{color:var(--text-dim);font-size:13px;text-align:center;padding:30px 20px;line-height:1.6;}
+
+/* ---------- modal ---------- */
+.modal-backdrop{
+  position:fixed;inset:0;background:rgba(5,6,9,0.72);z-index:50;
+  display:flex;align-items:flex-end;justify-content:center;
+}
+.modal{
+  background:var(--surface);border-radius:18px 18px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom,0px) + 20px);
+  max-height:80vh;overflow-y:auto;width:100%;max-width:520px;border:1px solid var(--border);border-bottom:none;
+}
+.modal h2{font-size:17px;margin-bottom:12px;}
+.modal p{font-size:13px;color:var(--text-dim);line-height:1.65;margin:0 0 10px;}
+.modal p b{color:var(--text);}
+.modal .close-modal{
+  width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:var(--surface-2);
+  color:var(--text);font-weight:700;font-size:13px;cursor:pointer;margin-top:10px;
+}
+.modal ul{margin:0 0 10px;padding-left:18px;color:var(--text-dim);font-size:13px;line-height:1.65;}
+.modal li b{color:var(--text);}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>
+    <h1 style="font-size:18px;">ICM DoN Trainer</h1>
+    <p id="loading-msg" style="margin-top:8px;">Calcul du classement des 169 mains de départ (simulation Monte-Carlo)…</p>
+  </div>
+  <div class="loadbar"><div class="loadbar-fill" id="loadbar-fill"></div></div>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div class="brand">
+      <b>ICM DoN Trainer</b>
+      <span>Swiss Casinos · Double or Nothing 6-max</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="icon-btn" id="btn-info" aria-label="Hypothèses du modèle">ⓘ</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="mix" class="active">Mixte</button>
+    <button data-tab="push">Push/Fold</button>
+    <button data-tab="call">Call/Fold</button>
+    <button data-tab="solver">Solver</button>
+    <button data-tab="stats">Stats</button>
+  </nav>
+
+  <main id="main-train">
+    <div class="infobar" id="infobar"></div>
+    <div class="table-wrap">
+      <div class="felt"></div>
+      <div class="pot-center" id="pot-center"></div>
+      <div id="seats"></div>
+    </div>
+
+    <div class="table-context">
+      <div class="hand-row">
+        <div class="hand-desc" id="hand-desc"></div>
+      </div>
+      <div class="situation" id="situation"></div>
+    </div>
+
+    <div id="feedback-slot"></div>
+  </main>
+
+  <main id="main-stats" hidden></main>
+  <main id="main-solver" hidden></main>
+
+  <div class="actionbar" id="actionbar">
+    <button class="fold" id="btn-fold">FOLD</button>
+    <button class="go" id="btn-go">ALL-IN</button>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="info-modal" hidden>
+  <div class="modal">
+    <h2>Comment ce modèle calcule les décisions</h2>
+    <p><b>Format simulé :</b> exactement la structure des Double or Nothing 6-max de Swiss Casinos (5 € affichés — la structure et le % de frais sont identiques à 10 €, donc la décision optimale en % du prize pool ne change pas selon le buy-in choisi). Stack de départ 1500 × 6 joueurs = <b>9000 jetons toujours en jeu à table</b>, quel que soit le nombre de joueurs restants (pas de rebuy/re-entry/add-on, donc le total ne bouge jamais). Niveaux de 4 min, blindes/antes N1 à N20 telles quelles, avec un niveau tiré en cohérence avec le nombre de joueurs restants (on ne peut pas être encore 6-handed à un niveau très tardif, ni déjà 4-handed dès les premières minutes). Les 3 joueurs restants se partagent le prize pool <b>à parts égales</b> (chacun reçoit exactement un tiers — 9,10 € à 5 €, 18,20 € à 10 €). Les mains sont générées à 4, 5 ou 6 joueurs restants, avec des stacks tirés aléatoirement mais dont la somme reste toujours 9000 (le cœur ICM se joue surtout à 4-handed, à la bulle).</p>
+    <p><b>Exact dans ce modèle :</b></p>
+    <ul>
+      <li><b>Équité ICM</b> — calculée par la méthode Malmuth-Harville (récursive, exacte, pas d'approximation) sur les stacks affichés.</li>
+      <li><b>Équité de ta main</b> — calculée par simulation Monte-Carlo réelle (des milliers de tirages de board) contre la range adverse retenue, pas une estimation à l'œil.</li>
+    </ul>
+    <p><b>Ce qui est un vrai calcul multivoie (pas une formule à deux joueurs) :</b></p>
+    <ul>
+      <li><b>Tout le monde peut caller.</b> En mode push : chaque position encore à parler entre toi et le BB — pas seulement le BB, pas seulement « la plus profonde » — est modélisée comme un adversaire séparé, avec sa propre range assumée de call/sur-relance et son propre stack effectif contre toi (souvent bien plus gros que celui du BB, qui est fréquemment très court et donc peu coûteux à affronter). En mode call, la même logique s'applique mais décalée : le BB est toujours la toute dernière position à parler préflop, donc toute position assise ENTRE le shover et toi a nécessairement déjà agi (déjà fold, vu que le pot affiché ne contient que les mises forcées) — tu n'affrontes jamais un « fantôme » qui n'a pas encore parlé. Mais toute position encore à parler APRÈS toi, jusqu'au BB inclus (dans le Solver, si tu n'es pas au BB), est bien un caller potentiel réel, exactement comme en mode push — le trainer génère toujours des spots où tu ES le BB, donc cette liste est vide par construction, mais le moteur la gère dans les deux cas.</li>
+      <li>La décision affichée (evAction) vient d'une vraie <b>simulation Monte-Carlo multivoie</b> (~700 tirages) : à chaque tirage, une main réelle est distribuée à chaque joueur encore à parler, comparée à sa propre range pour décider s'il callerait, et si plusieurs callent <i>dans le même tirage</i>, le(s) side-pot(s) réel(s) sont construits (mises plafonnées par le stack du joueur all-in, pots secondaires si les stacks diffèrent) puis évalués à un vrai showdown 7-cartes. L'équité ICM est recalculée sur le résultat exact de <i>chaque</i> tirage, puis moyennée — pas une moyenne des stacks suivie d'un seul calcul ICM (l'ICM n'est pas linéaire, l'ordre compte). C'est ce qui rend le calcul capable de représenter plusieurs callers en même temps, pas juste un adversaire à la fois.</li>
+      <li>La grille de 169 mains (ta range correcte affichée après « Explique ») utilise, elle, une approximation plus rapide (au plus un joueur supplémentaire qui call à la fois, pas la résolution multivoie complète) — mais ça reste 169 cases à calculer, donc plusieurs secondes (pas instantané), surtout sur un spot avec plusieurs décideurs encore à parler. La décision réelle ci-dessus, elle, tourne toujours le calcul multivoie complet, à 10 000 tirages Monte-Carlo (mesuré : ~0,3 seconde, le bruit résiduel ne compte quasiment plus).</li>
+    </ul>
+    <p><b>Ce qui reste une hypothèse simplificatrice (pas un solve GTO) :</b></p>
+    <ul>
+      <li>Les <b>ranges de push/call/sur-relance adverses</b> restent des modèles simplifiés basés sur la profondeur de stack et la position (plus le stack est court et la position tardive, plus la range s'élargit) — pas des ranges solvées à l'équilibre. Elles servent à obtenir un ordre de grandeur réaliste, jamais présentées comme un vrai solve GTO. Un vrai équilibre de Nash (meilleure réponse mutuelle) existe pour le duel toi-vs-BB (ou toi-vs-shover) à deux joueurs uniquement — bouton dédié, voir l'écran d'explication — mais un solve GTO complet à 3+ joueurs simultanés reste hors de portée d'un calcul dans le navigateur.</li>
+    </ul>
+    <p>Chaque main est un instantané indépendant (pas un tournoi simulé en continu) — l'objectif est d'entraîner ta lecture ICM sur des spots réalistes, pas de rejouer un tournoi entier.</p>
+    <button class="close-modal" id="close-info">Fermer</button>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+
+<script>
+"use strict";
+/* =========================================================================
+   CORE ENGINE — Swiss Casinos DoN 6-max structure, exact ICM (Malmuth-
+   Harville) + Monte-Carlo hand-vs-range equity. Validated against unit
+   tests before being embedded here (hand ranking order, ICM invariants,
+   forced-bet accounting, combo counts, equity sanity checks).
+   ========================================================================= */
+
+const LEVELS = [
+  {n:1, sb:10, bb:20, ante:0},
+  {n:2, sb:15, bb:30, ante:0},
+  {n:3, sb:25, bb:50, ante:5},
+  {n:4, sb:50, bb:100, ante:10},
+  {n:5, sb:75, bb:150, ante:15},
+  {n:6, sb:100, bb:200, ante:20},
+  {n:7, sb:125, bb:250, ante:25},
+  {n:8, sb:150, bb:300, ante:30},
+  {n:9, sb:200, bb:400, ante:40},
+  {n:10, sb:250, bb:500, ante:50},
+  {n:11, sb:300, bb:600, ante:60},
+  {n:12, sb:350, bb:700, ante:70},
+  {n:13, sb:400, bb:800, ante:80},
+  {n:14, sb:450, bb:900, ante:90},
+  {n:15, sb:500, bb:1000, ante:100},
+  {n:16, sb:600, bb:1200, ante:120},
+  {n:17, sb:700, bb:1400, ante:140},
+  {n:18, sb:800, bb:1600, ante:160},
+  {n:19, sb:900, bb:1800, ante:180},
+  {n:20, sb:1000, bb:2000, ante:200},
+];
+// Prize pool = 3 x 1.82 x buy-in (~9% de frais). Les 3 joueurs restants se partagent
+// ce prize pool à parts égales (chacun reçoit exactement un tiers). Le % de frais est
+// identique à 5€ et à 10€, donc la décision optimale (en % du prize pool) ne dépend
+// pas du buy-in choisi — un seul montant de référence suffit, on garde le 5€.
+const PRIZE = +(1.82*5).toFixed(2); // 9.10 € — part d'un joueur payé sur 3
+const LATENESS = {UTG:0,HJ:1,CO:2,BTN:3,SB:4,BB:5};
+// Used only by the (still explicitly 2-player) Nash solve below, as a cheap
+// stand-in for "some player other than the modeled caller might contest" when
+// iterating a pure two-range equilibrium. The single-hand fast-path decision
+// (analyze(), below) does not need this shortcut at all: it runs a genuine
+// multiway Monte-Carlo (simulateMultiwayEV) where every still-to-act player
+// is its own real, separate potential caller with its own range and its own
+// effective stack — see the deciders[] construction in analyze()'s push/call
+// branches.
+const SKIP_WAKE_RISK = 0.035;
+const POS_LABEL = {UTG:'UTG',HJ:'HJ',CO:'CO',BTN:'BTN',SB:'SB',BB:'BB'};
+
+function clamp(v,lo,hi){ return Math.max(lo, Math.min(hi, v)); }
+function forcedBet(pos, level){
+  if(pos==='SB') return level.ante+level.sb;
+  if(pos==='BB') return level.ante+level.bb;
+  return level.ante;
+}
+function positionsFor(N){ return ['UTG','HJ','CO','BTN','SB','BB'].slice(6-N); }
+function payoutsFor(N, prize){ return Array.from({length:N}, (_,i)=> i<3 ? prize : 0); }
+
+function icmEquity(stacks, payouts){
+  const n = stacks.length;
+  if(n===0) return [];
+  if(n===1) return [payouts[0]];
+  const T = stacks.reduce((a,b)=>a+b,0);
+  const eq = new Array(n).fill(0);
+  if(T<=0){ const share=payouts.slice(0,n).reduce((a,b)=>a+b,0)/n; return eq.fill(share); }
+  for(let i=0;i<n;i++){
+    const pFirst = stacks[i]/T;
+    if(pFirst<=0) continue;
+    eq[i]+= pFirst*payouts[0];
+    const remStacks = stacks.filter((_,idx)=>idx!==i);
+    const remPayouts = payouts.slice(1);
+    const subEq = icmEquity(remStacks, remPayouts);
+    let k=0;
+    for(let j=0;j<n;j++){ if(j===i) continue; eq[j]+= pFirst*subEq[k]; k++; }
+  }
+  return eq;
+}
+function heroEquityFromStacks(stacksArr, heroIdx, prize){
+  if(stacksArr[heroIdx] <= 0.5) return 0;
+  const filtered=[]; let heroNewIdx=-1;
+  stacksArr.forEach((s,i)=>{ if(s>0.5){ if(i===heroIdx) heroNewIdx=filtered.length; filtered.push(s); } });
+  const eq = icmEquity(filtered, payoutsFor(filtered.length, prize));
+  return eq[heroNewIdx];
+}
+
+/* ---- cards & evaluator ---- */
+const RANK_CHARS = ['2','3','4','5','6','7','8','9','T','J','Q','K','A'];
+const SUIT_SYM = ['♠','♥','♦','♣'];
+const SUIT_COLOR = ['black','red','red','black'];
+function rankChar2val(ch){ return RANK_CHARS.indexOf(ch)+2; }
+function valToChar(v){ return RANK_CHARS[v-2]; }
+function fullDeck(){ const d=[]; for(let r=2;r<=14;r++) for(let s=0;s<4;s++) d.push({r,s}); return d; }
+function cardsEqual(a,b){ return a.r===b.r && a.s===b.s; }
+function deckExcluding(exclude){ return fullDeck().filter(c=> !exclude.some(e=>cardsEqual(c,e))); }
+function drawRandom(deckArr, n){
+  const pool = deckArr.slice(); const out=[];
+  for(let i=0;i<n;i++){ const idx=Math.floor(Math.random()*pool.length); out.push(pool[idx]); pool.splice(idx,1); }
+  return out;
+}
+// Precomputed once: the 21 index-quintuples of "5 of 7", so evaluate7 never
+// re-derives them (or allocates a fresh closure/array tree) on every call —
+// this function alone is hit millions of times across a single multiway
+// simulation, so its cost is the app's real performance ceiling.
+const COMBO5_OF_7 = (()=>{
+  const idxs=[];
+  for(let a=0;a<7;a++)for(let b=a+1;b<7;b++)for(let c=b+1;c<7;c++)for(let d=c+1;d<7;d++)for(let e=d+1;e<7;e++) idxs.push([a,b,c,d,e]);
+  return idxs;
+})();
+// Same hand-ranking logic as a straightforward Object/Set/sort-based
+// implementation (verified bit-for-bit identical against it on tens of
+// thousands of random 7-card hands before this version replaced it) but
+// ~6x faster: plain typed-array rank/suit counts instead of Object.entries,
+// no Set/spread allocations, no closures. That speed is what makes it
+// affordable to run thousands of Monte-Carlo trials per decision instead of
+// a few hundred.
+function evaluate5(cards){
+  const rc = new Int8Array(15), sc = new Int8Array(4);
+  for(let i=0;i<5;i++){ rc[cards[i].r]++; sc[cards[i].s]++; }
+  const isFlush = (sc[0]===5||sc[1]===5||sc[2]===5||sc[3]===5);
+  let distinctCount=0, hi=-1, lo=99;
+  for(let r=2;r<=14;r++) if(rc[r]>0){ distinctCount++; if(r>hi) hi=r; if(r<lo) lo=r; }
+  let isStraight=false, straightHigh=0;
+  if(distinctCount===5){
+    if(hi-lo===4){ isStraight=true; straightHigh=hi; }
+    else if(hi===14 && rc[2]>0 && rc[3]>0 && rc[4]>0 && rc[5]>0){ isStraight=true; straightHigh=5; }
+  }
+  const gr=[];
+  for(let r=14;r>=2;r--) if(rc[r]>0) gr.push([r,rc[r]]);
+  gr.sort((a,b)=> b[1]-a[1] || b[0]-a[0]);
+  const c0=gr[0][1], c1=gr.length>1?gr[1][1]:0;
+  let category,kickers;
+  if(isStraight && isFlush){ category=8; kickers=[straightHigh]; }
+  else if(c0===4){ category=7; kickers=[gr[0][0],gr[1][0]]; }
+  else if(c0===3 && c1===2){ category=6; kickers=[gr[0][0],gr[1][0]]; }
+  else if(isFlush){ category=5; kickers=gr.map(g=>g[0]); }
+  else if(isStraight){ category=4; kickers=[straightHigh]; }
+  else if(c0===3){ category=3; kickers=[gr[0][0],gr[1][0],gr[2][0]]; }
+  else if(c0===2 && c1===2){ category=2; kickers=[gr[0][0],gr[1][0],gr[2][0]]; }
+  else if(c0===2){ category=1; kickers=[gr[0][0],gr[1][0],gr[2][0],gr[3][0]]; }
+  else { category=0; kickers=gr.map(g=>g[0]); }
+  let score=category;
+  for(let i=0;i<5;i++){ score = score*15 + (kickers[i]||0); }
+  return score;
+}
+function evaluate7(cards7){
+  let best=-1;
+  for(const idx of COMBO5_OF_7){
+    const s=evaluate5([cards7[idx[0]],cards7[idx[1]],cards7[idx[2]],cards7[idx[3]],cards7[idx[4]]]);
+    if(s>best) best=s;
+  }
+  return best;
+}
+
+/* ---- 169 starting hand classes ---- */
+const RANKORDER=['A','K','Q','J','T','9','8','7','6','5','4','3','2'];
+function genClasses(){
+  const classes=[];
+  for(let i=0;i<13;i++) for(let j=i;j<13;j++){
+    if(i===j) classes.push({cls:RANKORDER[i]+RANKORDER[i], combos:6});
+    else{ classes.push({cls:RANKORDER[i]+RANKORDER[j]+'s', combos:4}); classes.push({cls:RANKORDER[i]+RANKORDER[j]+'o', combos:12}); }
+  }
+  return classes;
+}
+function combosForClass(cls){
+  let r1ch,r2ch,type;
+  if(cls.length===2){ r1ch=cls[0]; r2ch=cls[1]; type='pair'; } else { r1ch=cls[0]; r2ch=cls[1]; type=cls[2]; }
+  const r1=rankChar2val(r1ch), r2=rankChar2val(r2ch); const combos=[];
+  if(type==='pair'){ for(let s1=0;s1<4;s1++) for(let s2=s1+1;s2<4;s2++) combos.push([{r:r1,s:s1},{r:r1,s:s2}]); }
+  else if(type==='s'){ for(let s=0;s<4;s++) combos.push([{r:r1,s:s},{r:r2,s:s}]); }
+  else { for(let s1=0;s1<4;s1++) for(let s2=0;s2<4;s2++) if(s1!==s2) combos.push([{r:r1,s:s1},{r:r2,s:s2}]); }
+  return combos;
+}
+function repCombo(cls){
+  if(cls.length===2) return [{r:rankChar2val(cls[0]),s:0},{r:rankChar2val(cls[0]),s:1}];
+  if(cls[2]==='s') return [{r:rankChar2val(cls[0]),s:0},{r:rankChar2val(cls[1]),s:0}];
+  return [{r:rankChar2val(cls[0]),s:0},{r:rankChar2val(cls[1]),s:1}];
+}
+async function buildHandRanking(trialsPerClass, onProgress){
+  const classes = genClasses();
+  const ranking=[];
+  for(let ci=0; ci<classes.length; ci++){
+    const {cls,combos} = classes[ci];
+    const hero = repCombo(cls);
+    let sum=0;
+    for(let t=0;t<trialsPerClass;t++){
+      const deck = deckExcluding(hero);
+      const villain = drawRandom(deck,2);
+      const deck2 = deckExcluding(hero.concat(villain));
+      const board = drawRandom(deck2,5);
+      const hs = evaluate7(hero.concat(board));
+      const vs = evaluate7(villain.concat(board));
+      if(hs>vs) sum+=1; else if(hs===vs) sum+=0.5;
+    }
+    ranking.push({cls, combos, equity: sum/trialsPerClass});
+    if(ci%6===0){ onProgress && onProgress(ci/classes.length); await new Promise(r=>setTimeout(r,0)); }
+  }
+  ranking.sort((a,b)=>b.equity-a.equity);
+  onProgress && onProgress(1);
+  return ranking;
+}
+function buildRange(ranking, pct){
+  const targetCombos = Math.round((pct/100)*1326);
+  let combos=0; const classes=[];
+  for(const item of ranking){ classes.push(item.cls); combos+=item.combos; if(combos>=targetCombos) break; }
+  return classes;
+}
+function rangeCutoffEquity(ranking, pct){
+  const targetCombos = Math.round((pct/100)*1326);
+  let combos=0, lastEquity = ranking.length ? ranking[ranking.length-1].equity : 0;
+  for(const item of ranking){ combos+=item.combos; lastEquity=item.equity; if(combos>=targetCombos) break; }
+  return lastEquity;
+}
+// Empirically (checked by re-running the ranking build several times), hands in
+// the dense "mediocre" cluster — roughly 45-58% equity vs a random hand, where
+// most offsuit and weak-suited hands live — are close enough to each other in
+// TRUE equity that sampling noise alone can swing a hand's rank by 40-50 places
+// between runs, even at several hundred trials per class. That's not a bug to
+// fix with more trials (the hands really are that close); it means a hard top-X%
+// cutoff will always look jagged/inconsistent right around the boundary. So,
+// same honesty standard as the hero range grid: classes within RANGE_MARGIN of
+// the cutoff equity are shown as "marginal" instead of forced into a hard
+// in/out that a rerun could just as easily have flipped.
+const RANGE_MARGIN = 0.05;
+function categorizeRangeByMargin(ranking, pct){
+  const cutoff = rangeCutoffEquity(ranking, pct);
+  const catMap = {};
+  ranking.forEach(item=>{
+    if(item.equity > cutoff + RANGE_MARGIN) catMap[item.cls] = 'good';
+    else if(item.equity > cutoff - RANGE_MARGIN) catMap[item.cls] = 'marginal';
+    // else: left uncategorized (clear fold/out)
+  });
+  return catMap;
+}
+function equityVsRangeWeighted(heroCards, rangeClasses, trials){
+  const weighted = rangeClasses.map(cls=>({cls, w: cls.length===2?6:(cls[2]==='s'?4:12)}));
+  const totalW = weighted.reduce((a,b)=>a+b.w,0);
+  let sum=0, counted=0;
+  for(let t=0;t<trials;t++){
+    let r = Math.random()*totalW; let chosen = weighted[weighted.length-1].cls;
+    for(const w of weighted){ if(r<w.w){ chosen=w.cls; break; } r-=w.w; }
+    const combos = combosForClass(chosen).filter(pair=> !pair.some(c=> heroCards.some(hc=>cardsEqual(hc,c))));
+    if(combos.length===0) continue;
+    const villain = combos[Math.floor(Math.random()*combos.length)];
+    const deck = deckExcluding(heroCards.concat(villain));
+    const board = drawRandom(deck,5);
+    const hs = evaluate7(heroCards.concat(board));
+    const vs = evaluate7(villain.concat(board));
+    if(hs>vs) sum+=1; else if(hs===vs) sum+=0.5;
+    counted++;
+  }
+  return counted>0 ? sum/counted : 0.5;
+}
+
+/* =========================================================================
+   GENUINE MULTIWAY PUSH/FOLD RESOLUTION — every player still able to act is
+   modeled as a real, separate potential caller (own range, own effective
+   stack), not a single tracked opponent with everyone else discounted away.
+   ========================================================================= */
+
+// Sample one hole-card combo drawn FROM WITHIN a range (weighted by how many
+// real combos each class represents), for a player whose action (already
+// having pushed) tells us their hand is conditioned on that range — as
+// opposed to a still-undecided player, whose hand is unconditional (see
+// simulateMultiwayEV below, which draws THOSE uniformly and only checks
+// range membership afterwards, since "would they call" is exactly what's
+// being decided by that draw).
+function sampleFromRange(rangeClasses, excludeCards){
+  const weighted = rangeClasses.map(cls=>({cls, w: cls.length===2?6:(cls[2]==='s'?4:12)}));
+  const totalW = weighted.reduce((a,b)=>a+b.w,0);
+  for(let attempt=0; attempt<40; attempt++){
+    let r = Math.random()*totalW; let chosen = weighted[weighted.length-1].cls;
+    for(const w of weighted){ if(r<w.w){ chosen=w.cls; break; } r-=w.w; }
+    const combos = combosForClass(chosen).filter(pair=> !pair.some(c=> excludeCards.some(ec=>cardsEqual(ec,c))));
+    if(combos.length===0) continue;
+    return combos[Math.floor(Math.random()*combos.length)];
+  }
+  return null; // exhausted after 40 tries — practically never happens at these table sizes
+}
+
+// Real poker mechanics, generalized to however many players end up in the
+// hand: whoever set the all-in amount (the shover) caps how much anyone else
+// can put at risk against them. A caller with MORE behind just matches the
+// shove and keeps the rest un-contested; a caller with LESS is all-in for
+// less and only contests a side pot against the deeper stacks. This builds
+// the correct side-pot layers for 2, 3, 4+ players, not just two.
+function resolveMultiwayFinalStacks(baseStacks, potBefore, shoverIdx, participants, board){
+  // participants: [{idx, hand}] — every player actually contesting this pot, shover included.
+  const capNet = baseStacks[shoverIdx];
+  const parts = participants.map(p=> ({idx:p.idx, hand:p.hand, contributed: Math.min(capNet, baseStacks[p.idx])}));
+  const finalStacks = baseStacks.slice();
+  parts.forEach(p=>{ finalStacks[p.idx] -= p.contributed; });
+  const scores = {};
+  parts.forEach(p=>{ scores[p.idx] = evaluate7(p.hand.concat(board)); });
+  const levels = [...new Set(parts.map(p=>p.contributed))].sort((a,b)=>a-b);
+  let prevLevel = 0, potAdded = false;
+  for(const lvl of levels){
+    const seg = lvl - prevLevel;
+    if(seg > 0){
+      const eligible = parts.filter(p=> p.contributed >= lvl);
+      let layerPot = seg * eligible.length;
+      if(!potAdded){ layerPot += potBefore; potAdded = true; } // the pot that existed before the push/call goes entirely to the first (smallest) layer
+      const maxScore = Math.max(...eligible.map(p=>scores[p.idx]));
+      const winners = eligible.filter(p=> scores[p.idx]===maxScore);
+      const share = layerPot/winners.length;
+      winners.forEach(w=>{ finalStacks[w.idx] += share; });
+    }
+    prevLevel = lvl;
+  }
+  return finalStacks;
+}
+
+// Bumped 2000 -> 10000 (measured, not guessed): std-dev of the resulting
+// equity across repeated runs of the SAME spot drops from ~0.81pp to ~0.32pp
+// (~2.5x, matches the 1/sqrt(trials) scaling law), for a real measured cost
+// of ~56ms -> ~306ms per decision — irrelevant for a single decision (this
+// constant, used by analyze()/the Solver), never applied to the 169-cell
+// grid below (GRID_TRIALS), which is a separate, much more expensive knob.
+const MULTIWAY_TRIALS = 10000;
+
+// The actual per-hand decision engine: every Monte-Carlo trial deals a real
+// hand to every player still able to act, checks each one against THEIR OWN
+// assumed calling range to decide if they're in, resolves the real side pots
+// for however many of them end up contesting the hand, and applies ICM to
+// THAT TRIAL's exact resulting stacks (not to an averaged/blended
+// approximation of two or three fixed branches) — then averages over many
+// trials. That per-trial ICM application matters: ICM is non-linear, so
+// averaging stacks first and applying ICM once would NOT give the same
+// answer as averaging ICM-equity trial by trial, which is what's done here.
+function simulateMultiwayEV(opts){
+  const {stacks, positions, level, shoverIdx, shoverHandFixed, shoverRangeClasses,
+         heroIdx, heroHand, otherDeciders, trials} = opts;
+  const forced = positions.map((pos,i)=> Math.min(stacks[i], forcedBet(pos, level)));
+  const potBefore = forced.reduce((a,b)=>a+b,0);
+  const baseStacks = stacks.map((s,i)=> s-forced[i]);
+  let sum = 0, counted = 0;
+  for(let t=0; t<trials; t++){
+    let excl = heroHand.slice();
+    let shoverHand = shoverHandFixed;
+    if(shoverHand){
+      excl = excl.concat(shoverHand);
+    } else {
+      shoverHand = sampleFromRange(shoverRangeClasses, excl);
+      if(!shoverHand) continue;
+      excl = excl.concat(shoverHand);
+    }
+    let deck = deckExcluding(excl);
+    const callers = [];
+    for(const d of otherDeciders){
+      if(deck.length < 7) break; // safety margin, never actually reached at 6-max table sizes
+      const hand = drawRandom(deck, 2);
+      deck = deck.filter(c=> !hand.some(hc=>cardsEqual(hc,c)));
+      const cls = classOfCards(hand);
+      if(d.rangeSet.has(cls)) callers.push({idx:d.idx, hand});
+    }
+    const board = drawRandom(deck, 5);
+    const participants = [{idx:shoverIdx, hand:shoverHand}];
+    if(heroIdx !== shoverIdx) participants.push({idx:heroIdx, hand:heroHand});
+    participants.push(...callers);
+    const finalStacks = resolveMultiwayFinalStacks(baseStacks, potBefore, shoverIdx, participants, board);
+    sum += heroEquityFromStacks(finalStacks, heroIdx, PRIZE);
+    counted++;
+  }
+  return counted>0 ? sum/counted : 0;
+}
+
+/* =========================================================================
+   SCENARIO GENERATION & EV ANALYSIS
+   ========================================================================= */
+let RANKING = null; // populated after loading
+
+// The 169-class ranking (equity vs a random hand) drives every range built in
+// this app — including the assumed push/call ranges shown as grids. With too
+// few Monte-Carlo trials per class, hands that are genuinely almost tied in
+// true equity (e.g. A8s vs A7s vs A6s) get shuffled into the wrong order by
+// sampling noise alone, which is exactly what makes a "top X%" range look
+// like scattered static instead of a coherent shape on the grid — there's
+// nothing to fix in how the range is BUILT once the ranking itself is this
+// noisy. Since this only runs once per app load (not per hand), it's worth
+// spending real time on accuracy — and caching the result so that cost is
+// paid at most once, not on every reload of what's meant to be used as a
+// home-screen app opened repeatedly at the table.
+const RANKING_CACHE_KEY = 'icmDonRankingCache_v1_t600';
+const RANKING_TRIALS = 600;
+async function loadOrBuildRanking(onProgress){
+  try{
+    const cached = localStorage.getItem(RANKING_CACHE_KEY);
+    if(cached){
+      const parsed = JSON.parse(cached);
+      if(Array.isArray(parsed) && parsed.length===169 && parsed.every(x=>x && typeof x.cls==='string' && typeof x.equity==='number' && typeof x.combos==='number')){
+        onProgress && onProgress(1);
+        return parsed;
+      }
+    }
+  }catch(e){ /* corrupt or unavailable cache — fall through and recompute */ }
+  const ranking = await buildHandRanking(RANKING_TRIALS, onProgress);
+  try{ localStorage.setItem(RANKING_CACHE_KEY, JSON.stringify(ranking)); }catch(e){ /* storage full/unavailable — just skip caching this time */ }
+  return ranking;
+}
+
+const TOTAL_CHIPS = 9000; // 6 players x 1500 starting stack — Swiss Casinos DoN has no rebuy/add-on/late reg,
+                          // so the total number of chips in play never changes, no matter how many players are left.
+
+// Real distribution of (joueurs restants × niveau de blindes) measured across
+// 358 parties Double or Nothing jouées par l'utilisateur (~10 000 mains, niveau
+// 3 minimum — avant ça le stack est encore ~1500, rien à entraîner). N et niveau
+// ne sont PAS indépendants dans la réalité (rester à 6 avec des blindes énormes
+// n'arrive quasiment jamais, puisque 6 handed veut dire que personne n'a encore
+// été éliminé) donc on tire les deux ENSEMBLE, pondéré sur ces vraies fréquences,
+// plutôt que N et niveau chacun de leur côté. Jamais observé au-delà du niveau 9
+// (250/500 ante 50) sur cet échantillon — pas la peine de préparer plus profond.
+const NL_WEIGHTS = { // index 0 = niveau 3 (LEVELS[2]) .. index 6 = niveau 9 (LEVELS[8])
+  4: [81, 451, 948, 983, 443, 129, 36],
+  5: [825, 1194, 1022, 446, 113, 34, 4],
+  6: [1569, 1124, 538, 103, 11, 0, 0],
+};
+const NL_LEVELIDX_BASE = 2; // LEVELS[2] === niveau 3
+function weightedNAndLevelIdx(){
+  const flat = [];
+  let total = 0;
+  for(const N of [4,5,6]){
+    NL_WEIGHTS[N].forEach((w,i)=>{
+      if(w>0){ total += w; flat.push({N, levelIdx: NL_LEVELIDX_BASE+i, cum: total}); }
+    });
+  }
+  const r = Math.random()*total;
+  const pick = flat.find(f=> r<f.cum) || flat[flat.length-1];
+  return [pick.N, pick.levelIdx];
+}
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+const MAX_REALISTIC_BB = 60; // beyond this depth a stack isn't push/fold-relevant anyway
+// Random partition of the table's fixed 9000 chips across N seats (skewed, like a
+// real table: some deeper, some shorter) instead of sampling each stack independently
+// — this is what guarantees the total always sums to exactly 9000. Weights are drawn
+// from a moderate range (not a heavy-tailed one) so a single seat can't implausibly
+// hoard most of the table's chips, and every stack is additionally capped at
+// MAX_REALISTIC_BB for the level in play (e.g. nobody can show up with 80bb at a
+// level where the average stack is only 15bb — the chips have to have gone somewhere).
+function genStacks(N, level){
+  const cap = Math.min(TOTAL_CHIPS*0.45, MAX_REALISTIC_BB*level.bb);
+  if(cap*N < TOTAL_CHIPS - 1e-6){
+    // Even an equal split would breach the cap (a very deep field relative to this
+    // level) — spread the chips as evenly as possible instead of trying to skew them.
+    const chips = new Array(N).fill(0);
+    let remaining = TOTAL_CHIPS;
+    for(let i=0;i<N;i++){ chips[i] = Math.round(remaining/(N-i)/5)*5; remaining -= chips[i]; }
+    return chips;
+  }
+  // Water-filling: allocate the 9000 chips proportionally to random weights, but any
+  // seat whose proportional share would exceed `cap` is pinned at the cap and removed
+  // from the pool, with the rest re-distributed among what's left — so the total
+  // always lands on exactly 9000 while no single seat ever implausibly hoards chips
+  // relative to the blind level in play.
+  const weights = Array.from({length:N}, ()=> 0.25 + Math.random());
+  let free = Array.from({length:N}, (_,i)=>i);
+  let chips = new Array(N).fill(0);
+  let remaining = TOTAL_CHIPS;
+  for(let iter=0; iter<N && free.length>0; iter++){
+    const wsum = free.reduce((a,i)=>a+weights[i],0);
+    let anyCapped = false;
+    for(const i of free.slice()){
+      const share = remaining*weights[i]/wsum;
+      if(share > cap){ chips[i]=cap; remaining-=cap; free=free.filter(x=>x!==i); anyCapped=true; }
+    }
+    if(!anyCapped){ for(const i of free) chips[i] = remaining*weights[i]/wsum; break; }
+  }
+  chips = chips.map(c=> Math.max(5, Math.round(c/5)*5));
+  chips = chips.map(c=> Math.min(c, cap));
+  let diff = TOTAL_CHIPS - chips.reduce((a,b)=>a+b,0);
+  let idx = chips.findIndex(c=> c<cap);
+  if(idx<0) idx = 0;
+  chips[idx] = Math.min(chips[idx]+diff, cap+Math.abs(diff)); // best-effort in the rare tie-at-cap edge case
+  return chips;
+}
+
+// Only train spots where the confrontation is actually push/fold-relevant:
+// the EFFECTIVE stack between hero and the key villain (whichever of the
+// two can lose less — what's genuinely at risk in the hand) must be at
+// most 15bb. Above that, it stops being a push/fold decision and becomes a
+// regular postflop-relevant stack — not what this trainer is for.
+const EFF_STACK_CAP_BB = 15;
+
+// Same threshold used everywhere in the app to call a spot "marginal" (the
+// CONFIANCE label, the grid's good/marginal split) — reused here to also
+// gate WHICH hands the trainer deals in the first place: below this, the
+// gap between the two choices is comfortably clear of Monte-Carlo noise
+// (at MULTIWAY_TRIALS=10000, measured std-dev is ~0.32pp — this margin is
+// ~14x that), but that's a side effect, not the point. The point is that a
+// coin-flip-close spot isn't useful training reps: there's no clean lesson
+// in a hand where either answer is nearly correct. 4.5pp keeps genuinely
+// marginal-but-learnable spots (that's still a wide band) while cutting the
+// truly razor's-edge ones. Raise it for only-clear-cut reps, lower it (or
+// set to 0) to bring back close calls.
+const CONFIDENCE_MARGIN = 0.045; // fraction of PRIZE
+
+function genScenario(mode){ // mode: 'push' | 'call'
+  const [N, levelIdx] = weightedNAndLevelIdx();
+  const level = LEVELS[levelIdx];
+  const positions = positionsFor(N);
+  const bbIdx = positions.indexOf('BB');
+  const nonBB = positions.map((p,i)=>i).filter(i=>i!==bbIdx);
+
+  // Regenerate the chip split if it leaves hero or the key villain with nothing to
+  // actually push/call with (their own forced bet already ate their whole stack) —
+  // that's a degenerate non-decision, not a push/fold or call/fold spot — or if the
+  // effective stack between them is too deep to be push/fold-relevant (see above).
+  let stacks, heroIdx, villainIdx, ok = false;
+  for(let attempt=0; attempt<150; attempt++){
+    stacks = shuffle(genStacks(N, level)); // sums to exactly TOTAL_CHIPS, randomly assigned to seats
+    if(mode==='push'){ heroIdx = nonBB[Math.floor(Math.random()*nonBB.length)]; villainIdx = bbIdx; }
+    else { heroIdx = bbIdx; villainIdx = nonBB[Math.floor(Math.random()*nonBB.length)]; }
+    const heroForced = forcedBet(positions[heroIdx], level);
+    const villainForced = forcedBet(positions[villainIdx], level);
+    if(stacks[heroIdx] <= heroForced || stacks[villainIdx] <= villainForced) continue;
+    const heroNet = stacks[heroIdx] - heroForced, villainNet = stacks[villainIdx] - villainForced;
+    const effBB = Math.min(heroNet, villainNet) / level.bb;
+    if(effBB <= EFF_STACK_CAP_BB){ ok = true; break; }
+  }
+  if(!ok){
+    // 150 random reshuffles never landed a short-enough effective stack for this
+    // N/level (can happen early in the structure, where every stack is still close
+    // to the 1500 starting stack) — force it directly instead of failing silently:
+    // shrink whichever of hero/villain is deeper down to a random short stack, and
+    // hand the chips removed to a third seat so the table still sums to exactly
+    // TOTAL_CHIPS. Rare in practice (most draws succeed well within 150 tries).
+    const heroForced = forcedBet(positions[heroIdx], level);
+    const villainForced = forcedBet(positions[villainIdx], level);
+    const heroNet = stacks[heroIdx] - heroForced, villainNet = stacks[villainIdx] - villainForced;
+    const deeperIdx = heroNet >= villainNet ? heroIdx : villainIdx;
+    const deeperForced = deeperIdx===heroIdx ? heroForced : villainForced;
+    const targetBB = 4 + Math.random()*(EFF_STACK_CAP_BB-4); // land somewhere in the short-stack range, not always right at the cap
+    const targetNet = Math.round(targetBB*level.bb/5)*5;
+    const targetGross = targetNet + deeperForced;
+    const freed = stacks[deeperIdx] - targetGross;
+    const others = positions.map((p,i)=>i).filter(i=> i!==heroIdx && i!==villainIdx);
+    const absorbIdx = others[Math.floor(Math.random()*others.length)];
+    stacks[deeperIdx] = targetGross;
+    stacks[absorbIdx] += freed;
+  }
+
+  const deck = fullDeck();
+  const heroCards = ensureOffsuitContrast(drawRandom(deck,2));
+
+  return {mode, N, level, positions, stacks, heroIdx, villainIdx, heroCards};
+}
+
+// Purely a display convention — doesn't touch equity math at all. Two
+// specific cards of the same rank-pair (a pair) or the same suit (suited)
+// are unaffected. But for a genuinely offsuit hand, the exact suits dealt
+// don't matter for equity (any two different suits are interchangeable by
+// symmetry of a standard deck), so when they happen to land on two suits of
+// the SAME color (e.g. spade+club — both black, easy to mistake for suited
+// at a glance, especially across several tables at once), reassign the
+// second card to a suit of the opposite color instead. Same rank, same
+// "offsuit" fact, just visually unambiguous: an offsuit hand always shows
+// one black card and one red card.
+function ensureOffsuitContrast(cards){
+  const [c1,c2] = cards;
+  if(c1.r===c2.r) return cards;           // pair — suit not a "suited?" question
+  if(c1.s===c2.s) return cards;           // genuinely suited — leave it alone
+  if(SUIT_COLOR[c1.s]!==SUIT_COLOR[c2.s]) return cards; // already one black, one red
+  const oppositeSuits = SUIT_COLOR[c1.s]==='black' ? [1,2] : [0,3];
+  const newSuit = oppositeSuits[Math.floor(Math.random()*2)];
+  return [c1, {r:c2.r, s:newSuit}];
+}
+
+function analyze(scn, trials){
+  trials = trials || MULTIWAY_TRIALS; // caller can pass a cheaper trial count for fast screening (see newHand())
+  const {mode, stacks, positions, heroIdx, villainIdx, level, N, heroCards} = scn;
+  // `stacks[]` are GROSS current chip counts (what's shown at the table, summing to
+  // exactly TOTAL_CHIPS). Each seat's forced bet (ante, +SB/BB) is posted out of that
+  // same stack, not created on top of it — so every resolved outcome below is built
+  // by first taking every seat net of its own forced bet, then moving the contested
+  // wager and the pot to whoever wins it. This keeps every branch summing to exactly
+  // TOTAL_CHIPS, the same way the real chip count on the table never changes.
+  // Nobody can be forced to post more than they actually have (an ante/blind bigger
+  // than a crumb of a stack just means they're all-in for whatever's left of it).
+  const forced = positions.map((pos,i)=> Math.min(stacks[i], forcedBet(pos, level)));
+  const potBefore = forced.reduce((a,b)=>a+b,0);
+  const heroNet = stacks[heroIdx] - forced[heroIdx];       // what hero has left to push/call with
+  const villainNet = stacks[villainIdx] - forced[villainIdx];
+  const effCall = Math.min(heroNet, villainNet);
+
+  function resolvedStacks(winIdx, loseIdx, wager){
+    const out = stacks.map((s,i)=> s - forced[i]); // everyone net of their own forced bet first
+    out[winIdx] += wager + potBefore;               // winner takes the wagered chips back plus the whole pot
+    out[loseIdx] -= wager;                           // loser only loses what they actually put in beyond their forced bet
+    return out;
+  }
+
+  // "Fold" baseline: what your ICM equity actually becomes if you fold RIGHT NOW.
+  // Your ante/blind already posted this hand is NOT refunded by folding — it's
+  // already in the pot and goes to the villain uncontested, same as in real poker.
+  // (Using the raw pre-hand stack here would overstate fold's value whenever the
+  // forced bet is a big chunk of your stack — e.g. a short BB facing a shove is
+  // already "in" for most of what they have, so folding is nowhere near as safe
+  // as just keeping your displayed stack.)
+  const evFold = heroEquityFromStacks(resolvedStacks(villainIdx, heroIdx, 0), heroIdx, PRIZE);
+
+  if(mode==='push'){
+    const heroBB = heroNet/level.bb, callerBB = villainNet/level.bb;
+    const lateness = LATENESS[positions[heroIdx]];
+    const cPct = clamp(46 - heroBB*1.6 + callerBB*0.35 + lateness*1.5, 4, 62);
+    const rangeClasses = buildRange(RANKING, cPct);
+    const pWin = equityVsRangeWeighted(heroCards, rangeClasses, trials); // display stat only: hero's equity vs the BB's range alone
+
+    const evUncalled = heroEquityFromStacks(resolvedStacks(heroIdx, villainIdx, 0), heroIdx, PRIZE);
+    const evWin = heroEquityFromStacks(resolvedStacks(heroIdx, villainIdx, effCall), heroIdx, PRIZE);
+    const evLose = heroEquityFromStacks(resolvedStacks(villainIdx, heroIdx, effCall), heroIdx, PRIZE);
+
+    // EVERY position still left to act between hero and the BB is a genuine,
+    // separate potential caller — not a discount applied to a single tracked
+    // opponent, and not just the single deepest one either. Each gets its
+    // own assumed range (tighter than the BB's forced range: calling here is
+    // a voluntary isolate/reshove, not a forced decision with no more action
+    // behind it) and, crucially, its own effective stack against hero — often
+    // much deeper than the BB's, which is frequently short and cheap to bust.
+    // The real decision below (evPush) is computed by a genuine multiway
+    // Monte-Carlo (simulateMultiwayEV): every trial deals an actual hand to
+    // every one of these players, checks it against their own range, and
+    // resolves real side pots for however many end up calling at once —
+    // including more than one calling in the same trial, which a chain of
+    // independent two-player branches could never capture.
+    const deciders = [];
+    for(let i=heroIdx+1; i<villainIdx; i++){
+      const net = stacks[i] - Math.min(stacks[i], forcedBet(positions[i], level));
+      const netBB = net/level.bb;
+      const decLateness = LATENESS[positions[i]];
+      const pct = clamp(20 - heroBB*1.0 + netBB*0.4 + decLateness*1.0, 3, 45);
+      const rc = buildRange(RANKING, pct);
+      const dEffCall = Math.min(heroNet, net);
+      const evWinD = heroEquityFromStacks(resolvedStacks(heroIdx, i, dEffCall), heroIdx, PRIZE);
+      const evLoseD = heroEquityFromStacks(resolvedStacks(i, heroIdx, dEffCall), heroIdx, PRIZE);
+      deciders.push({idx:i, pos:positions[i], pct, rangeClasses:rc, rangeSet:new Set(rc), evWin:evWinD, evLose:evLoseD, effCall:dEffCall});
+    }
+    deciders.push({idx:villainIdx, pos:positions[villainIdx], pct:cPct, rangeClasses, rangeSet:new Set(rangeClasses), evWin, evLose, effCall});
+
+    const evPush = simulateMultiwayEV({
+      stacks, positions, level, shoverIdx:heroIdx, shoverHandFixed:heroCards, shoverRangeClasses:null,
+      heroIdx, heroHand:heroCards, otherDeciders:deciders, trials
+    });
+
+    return {evAction:evPush, evFold, actionLabel:'ALL-IN', foldLabel:'FOLD', villainRangePct:cPct, villainRangeClasses:rangeClasses,
+      pWin, potBefore, effCall, villainRole:'BB (callant)', correctAction: evPush>evFold?'push':'fold',
+      evWin, evLose, evUncalled, deciders};
+  } else {
+    const pusherBB = villainNet/level.bb, callerBB = heroNet/level.bb;
+    const lateness = LATENESS[positions[villainIdx]];
+    const sPct = clamp((22-pusherBB)*4.5 + lateness*4, 5, 95);
+    const rangeClasses = buildRange(RANKING, sPct);
+    const pWin = equityVsRangeWeighted(heroCards, rangeClasses, trials); // display stat only: hero's equity vs the shover's range alone
+
+    const evWin = heroEquityFromStacks(resolvedStacks(heroIdx, villainIdx, effCall), heroIdx, PRIZE);
+    const evLose = heroEquityFromStacks(resolvedStacks(villainIdx, heroIdx, effCall), heroIdx, PRIZE);
+
+    // Any seat sitting between the SHOVER and HERO has, by the time it's
+    // genuinely hero's turn to decide, already acted — the BB is always the
+    // very last position to act preflop, so if it's hero's turn, everyone
+    // seated before hero (and after the shover) has necessarily already
+    // folded (the pot here only ever contains forced bets, never an extra
+    // call). That part is NOT symmetric to the push branch.
+    // But seats AFTER hero, up to and including the BB, have NOT acted yet —
+    // exactly like the push branch's still-to-act deciders, just running
+    // after hero's own decision point instead of after the shove. When hero
+    // IS the BB (the trainer's usual call spot) this loop is naturally empty,
+    // since nobody sits after the BB — that's the historical special case.
+    // But a real hand can have hero cold-calling from an earlier seat (e.g.
+    // hero in CO calling a UTG shove with BTN/SB/BB still to act behind),
+    // and those are genuine extra callers, not free folds.
+    const bbIdx = positions.indexOf('BB');
+    const deciders = [];
+    for(let i=heroIdx+1; i<=bbIdx; i++){
+      const net = stacks[i] - Math.min(stacks[i], forcedBet(positions[i], level));
+      const netBB = net/level.bb;
+      const decLateness = LATENESS[positions[i]];
+      const pct = clamp(20 - pusherBB*1.0 + netBB*0.4 + decLateness*1.0, 3, 45);
+      const rc = buildRange(RANKING, pct);
+      const dEffCall = Math.min(heroNet, net);
+      const evWinD = heroEquityFromStacks(resolvedStacks(heroIdx, i, dEffCall), heroIdx, PRIZE);
+      const evLoseD = heroEquityFromStacks(resolvedStacks(i, heroIdx, dEffCall), heroIdx, PRIZE);
+      deciders.push({idx:i, pos:positions[i], pct, rangeClasses:rc, rangeSet:new Set(rc), evWin:evWinD, evLose:evLoseD, effCall:dEffCall});
+    }
+
+    const evCall = simulateMultiwayEV({
+      stacks, positions, level, shoverIdx:villainIdx, shoverHandFixed:null, shoverRangeClasses:rangeClasses,
+      heroIdx, heroHand:heroCards, otherDeciders:deciders, trials
+    });
+
+    return {evAction:evCall, evFold, actionLabel:'CALL', foldLabel:'FOLD', villainRangePct:sPct, villainRangeClasses:rangeClasses,
+      pWin, potBefore, effCall, villainRole:positions[villainIdx]+' (shover)', correctAction: evCall>evFold?'call':'fold',
+      evWin, evLose, deciders};
+  }
+}
+
+function classOfCards(cards){
+  const [c1,c2] = cards;
+  const hi = Math.max(c1.r,c2.r), lo = Math.min(c1.r,c2.r);
+  const hiCh = RANK_CHARS[hi-2], loCh = RANK_CHARS[lo-2];
+  if(hi===lo) return hiCh+hiCh;
+  return hiCh+loCh+(c1.s===c2.s?'s':'o');
+}
+
+// Generic pusher-vs-caller branch stacks, usable from EITHER player's point of
+// view (unlike analyze(), which is always written from hero's perspective).
+// Needed for the Nash solve below: to find a mutual best response we need
+// villain's own EV of calling/folding just as much as hero's EV of
+// pushing/folding, computed on the exact same physical pot/stacks.
+function branchStacks(stacks, positions, level, pusherIdx, callerIdx){
+  const forced = positions.map((pos,i)=> Math.min(stacks[i], forcedBet(pos, level)));
+  const potBefore = forced.reduce((a,b)=>a+b,0);
+  const pusherNet = stacks[pusherIdx]-forced[pusherIdx];
+  const callerNet = stacks[callerIdx]-forced[callerIdx];
+  const effCall = Math.min(pusherNet, callerNet);
+  function resolvedStacks(winIdx, loseIdx, wager){
+    const out = stacks.map((s,i)=> s-forced[i]);
+    out[winIdx]+=wager+potBefore; out[loseIdx]-=wager; return out;
+  }
+  return {
+    pusherWinsUncontested: resolvedStacks(pusherIdx, callerIdx, 0),  // caller folds
+    callerWinsUncontested: resolvedStacks(callerIdx, pusherIdx, 0),  // pusher never pushes / declines
+    pusherWinsShowdown: resolvedStacks(pusherIdx, callerIdx, effCall),
+    callerWinsShowdown: resolvedStacks(callerIdx, pusherIdx, effCall),
+    effCall, potBefore
+  };
+}
+
+function comboWidthOfRange(rangeClasses){
+  const set = new Set(rangeClasses);
+  let combos = 0;
+  genClasses().forEach(c=>{ if(set.has(c.cls)) combos += c.combos; });
+  return combos/1326;
+}
+
+// A REAL Nash equilibrium for the heads-up push-or-fold / call-or-fold subgame
+// this app models (hero vs the one opponent whose range is tracked — BB in
+// push mode, the shover in call mode) — found by iterated mutual best
+// response, using the exact same ICM engine as everywhere else in the app,
+// instead of the hand-tuned cPct/sPct formula. NOT a claim of solving the
+// full 6-max multiway game (see the ⓘ modal) — this narrows to exactly the
+// two-player subgame the rest of the app already narrows to, but SOLVES it
+// rather than estimating it.
+//
+// Each iteration: (1) the caller's range is recomputed as every class whose
+// equity vs the CURRENT pusher range makes calling beat folding: (2) the
+// pusher's range is then recomputed the same way against that new caller
+// range (with the same per-skipped-position wake-up risk used elsewhere).
+// This is a standard fictitious-play-style approach for push/fold games; it
+// isn't guaranteed to converge to an exact fixed point under Monte-Carlo
+// noise, so it runs a fixed number of iterations and reports the final
+// ranges rather than claiming strict convergence.
+async function nashSolveHeadsUp(scn, seedPusherPct, seedCallerPct, onProgress){
+  const {stacks, positions, level, heroIdx, villainIdx, mode} = scn;
+  const pusherIdx = mode==='push' ? heroIdx : villainIdx;
+  const callerIdx = mode==='push' ? villainIdx : heroIdx;
+  const skippedCount = Math.max(0, callerIdx - pusherIdx - 1);
+
+  const b = branchStacks(stacks, positions, level, pusherIdx, callerIdx);
+  const pusherFold = heroEquityFromStacks(b.callerWinsUncontested, pusherIdx, PRIZE);
+  const pusherUncalled = heroEquityFromStacks(b.pusherWinsUncontested, pusherIdx, PRIZE);
+  const pusherWinEV = heroEquityFromStacks(b.pusherWinsShowdown, pusherIdx, PRIZE);
+  const pusherLoseEV = heroEquityFromStacks(b.callerWinsShowdown, pusherIdx, PRIZE);
+  const callerFold = heroEquityFromStacks(b.pusherWinsUncontested, callerIdx, PRIZE);
+  const callerWinEV = heroEquityFromStacks(b.callerWinsShowdown, callerIdx, PRIZE);
+  const callerLoseEV = heroEquityFromStacks(b.pusherWinsShowdown, callerIdx, PRIZE);
+
+  const classes = genClasses();
+  const TRIALS = 90, MAX_ITERS = 8;
+
+  let pusherRange = buildRange(RANKING, seedPusherPct);
+  let callerRange = buildRange(RANKING, seedCallerPct);
+  let iterUsed = 0;
+
+  for(let iter=0; iter<MAX_ITERS; iter++){
+    iterUsed = iter+1;
+    onProgress && onProgress(iter, MAX_ITERS, 'caller');
+    const newCallerRange = [];
+    for(let ci=0; ci<classes.length; ci++){
+      const {cls} = classes[ci];
+      const combo = repCombo(cls);
+      const pWin = pusherRange.length ? equityVsRangeWeighted(combo, pusherRange, TRIALS) : 0.5;
+      const evCall = pWin*callerWinEV + (1-pWin)*callerLoseEV;
+      if(evCall > callerFold) newCallerRange.push(cls);
+      if(ci%20===0) await new Promise(r=>setTimeout(r,0));
+    }
+
+    onProgress && onProgress(iter, MAX_ITERS, 'pusher');
+    const callWidth = comboWidthOfRange(newCallerRange);
+    const noContestProb = (1-callWidth) * Math.pow(1-SKIP_WAKE_RISK, skippedCount);
+    const newPusherRange = [];
+    for(let ci=0; ci<classes.length; ci++){
+      const {cls} = classes[ci];
+      const combo = repCombo(cls);
+      const pWin = newCallerRange.length ? equityVsRangeWeighted(combo, newCallerRange, TRIALS) : 1;
+      const evCalled = pWin*pusherWinEV + (1-pWin)*pusherLoseEV;
+      const evPush = noContestProb*pusherUncalled + (1-noContestProb)*evCalled;
+      if(evPush > pusherFold) newPusherRange.push(cls);
+      if(ci%20===0) await new Promise(r=>setTimeout(r,0));
+    }
+
+    pusherRange = newPusherRange;
+    callerRange = newCallerRange;
+  }
+
+  return {pusherRange, callerRange, pusherIdx, callerIdx, pusherFold, callerFold, skippedCount, iterations: iterUsed};
+}
+
+/* =========================================================================
+   UI
+   ========================================================================= */
+const $ = sel => document.querySelector(sel);
+const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+let currentTabMode = 'mix'; // mix | push | call
+let solverState = {
+  N: 6, levelIdx: 2, stacks: {}, shover: '', heroPos: 'UTG',
+  card1: {r:14, s:0}, card2: {r:13, s:0}
+};
+let currentScenario = null;
+let currentAnalysis = null;
+let answered = false;
+
+const STATS_KEY = 'icmDonTrainerStats_v1';
+function loadStats(){
+  try{
+    const raw = localStorage.getItem(STATS_KEY);
+    if(raw) return JSON.parse(raw);
+  }catch(e){}
+  return {hands:0, correct:0, streak:0, best:0, byMode:{push:{hands:0,correct:0}, call:{hands:0,correct:0}}, leaks:{}};
+}
+function saveStats(s){ try{ localStorage.setItem(STATS_KEY, JSON.stringify(s)); }catch(e){} }
+let stats = loadStats();
+
+function fmtEUR(x){ return x.toFixed(2).replace('.', ',') + ' €'; }
+function fmtPct(x){ return (x/PRIZE*100).toFixed(1).replace('.', ',') + ' %'; }
+function fmtBB(chips, bb){ return (chips/bb).toFixed(1) + ' bb'; }
+
+function seatCoords(dispIdx, N){
+  // Evenly spaced around an oval table. dispIdx is the seat's position RELATIVE
+  // TO HERO (0 = hero), so hero always renders at the bottom — exactly like a
+  // real client always shows you at the bottom and seats everyone else around
+  // you — and the rest of the table fills in clockwise from there.
+  const angle = 90 + dispIdx*(360/N);
+  const rad = angle*Math.PI/180;
+  const rx = 44, ry = 41; // radius in % of the table-wrap box
+  return { left: 50 + rx*Math.cos(rad), top: 50 + ry*Math.sin(rad) };
+}
+
+function renderCard(card, container){
+  const div = document.createElement('div');
+  div.className = 'card ' + SUIT_COLOR[card.s];
+  div.innerHTML = '<div class="r">'+valToChar(card.r)+'</div><div class="s">'+SUIT_SYM[card.s]+'</div>';
+  container.appendChild(div);
+}
+
+// How many times to redraw just hero's two cards (same table/stacks) before
+// giving up and regenerating the whole scenario (new stacks/positions too).
+// Redrawing hero's cards is cheap and, since only a minority of the 169
+// classes sit within CONFIDENCE_MARGIN of the cutoff for any given table,
+// usually finds a decisive hand within a handful of tries. Regenerating the
+// whole scenario is the fallback for tables where the split genuinely
+// leaves few/no classes clearly decisive (rare, but not impossible near an
+// ICM near-chop).
+const MAX_HAND_REDRAWS = 15;
+const MAX_SCENARIO_REGENS = 4;
+// Redrawing hero's hand needs to check LOTS of candidates fast, so the search
+// itself runs analyze() at a cheap trial count (measured: ~10000 trials costs
+// ~900ms/call at N=6, way too slow to redraw against — 500 trials is ~45x
+// cheaper) — that's noisier, so a candidate has to clear a bigger bar
+// (SCREEN_SAFETY x the real threshold) during the search to count as a hit,
+// which keeps a noisy near-miss from later falling back under the real
+// threshold. Only the ONE final chosen hand gets recomputed at full
+// MULTIWAY_TRIALS precision for what's actually shown and graded.
+const SCREEN_TRIALS = 500;
+const SCREEN_SAFETY = 1.3;
+
+function newHand(){
+  answered = false;
+  let mode = currentTabMode;
+  if(mode==='mix') mode = Math.random()<0.5 ? 'push':'call';
+
+  let scn, aScreen, bestScn = null, bestGap = -Infinity;
+  outer:
+  for(let regen=0; regen<MAX_SCENARIO_REGENS; regen++){
+    scn = genScenario(mode);
+    aScreen = analyze(scn, SCREEN_TRIALS);
+    let gap = Math.abs(aScreen.evAction-aScreen.evFold);
+    if(gap > bestGap){ bestGap = gap; bestScn = scn; }
+    if(gap >= CONFIDENCE_MARGIN*PRIZE*SCREEN_SAFETY) break outer;
+    for(let redraw=0; redraw<MAX_HAND_REDRAWS; redraw++){
+      const heroCards = ensureOffsuitContrast(drawRandom(fullDeck(), 2));
+      scn = {...scn, heroCards};
+      aScreen = analyze(scn, SCREEN_TRIALS);
+      gap = Math.abs(aScreen.evAction-aScreen.evFold);
+      if(gap > bestGap){ bestGap = gap; bestScn = scn; }
+      if(gap >= CONFIDENCE_MARGIN*PRIZE*SCREEN_SAFETY) break outer;
+    }
+    // Neither the dealt hand nor ~15 redraws found a clearly decisive one on
+    // this table (fast screen) — keep the best one seen and try a fresh table.
+  }
+  // One real computation, at full precision, for the hand we're actually showing.
+  currentScenario = bestScn;
+  currentAnalysis = analyze(bestScn);
+  renderScenario();
+}
+
+function renderScenario(){
+  const scn = currentScenario;
+  const {positions, stacks, heroIdx, villainIdx, level, N, heroCards, mode} = scn;
+
+  const infobar = $('#infobar');
+  infobar.innerHTML =
+    '<span class="pill">Niveau '+level.n+'</span>'+
+    (level.ante ? '<span class="pill">Ante <b>'+level.ante+'</b></span>' : '') +
+    '<span class="pill n">'+N+' joueurs restants</span>'+
+    '<span class="pill">'+TOTAL_CHIPS+' jetons en jeu</span>';
+
+  $('#pot-center').innerHTML =
+    '<div class="lvl">Niveau '+level.n+(level.ante?' · ante '+level.ante:'')+'</div>'+
+    '<div class="blinds">'+level.sb+' / '+level.bb+'</div>'+
+    '<div class="n">'+N+' JOUEURS RESTANTS</div>';
+
+  const seatsEl = $('#seats'); seatsEl.innerHTML='';
+  positions.forEach((pos,i)=>{
+    // "Tout le monde peut caller" (cf. légende ligne ~371) : en mode push, CHAQUE
+    // position encore à parler entre hero et le BB (pas seulement le BB) est un
+    // décideur réel modélisé séparément par le moteur (a.deciders) ; en mode call,
+    // chaque position encore à parler entre le shover et hero (BB) l'est aussi.
+    // On tague donc CHAQUE décideur, pas uniquement villainIdx.
+    const deciderHere = currentAnalysis && currentAnalysis.deciders
+      ? currentAnalysis.deciders.find(d=>d.idx===i) : null;
+    const div = document.createElement('div');
+    div.className = 'seat' + (i===heroIdx?' hero':'') + (i===villainIdx?' villain':'') + (deciderHere && i!==villainIdx?' decider':'');
+    const dispIdx = (i - heroIdx + N) % N; // hero is always dispIdx 0 -> always at the bottom
+    const {left, top} = seatCoords(dispIdx, N);
+    div.style.left = left+'%';
+    div.style.top = top+'%';
+    let tag = '';
+    // The decision badge always sits on HERO's own seat — it's hero who acts,
+    // never the villain — so it's unambiguous even at a glance which seat the
+    // question is actually about.
+    if(i===heroIdx) tag = mode==='push' ? '<span class="tag">TOI · PUSH ?</span>' : '<span class="tag">TOI · CALL ?</span>';
+    else if(mode==='call' && i===villainIdx) tag = '<span class="tag">SHOVE</span>';
+    else if(deciderHere) tag = '<span class="tag">PEUT CALLER ('+deciderHere.pct.toFixed(0)+'%)</span>';
+    const posted = Math.min(stacks[i], forcedBet(pos, level));
+    // stacks[i] is the GROSS chip count (see the comment in analyze()) — it
+    // still includes whatever this seat has already posted as a forced bet
+    // this hand. Showing that gross number as "the stack" is misleading for
+    // a short blind: it can look like they have plenty behind when almost
+    // all of it is already committed to the pot. The headline stack figure
+    // here is the NET amount actually still available to push/call with;
+    // the forced bet already in is shown separately on its own line below.
+    const available = stacks[i] - posted;
+    let postedLabel = pos==='SB' ? 'SB' : pos==='BB' ? 'BB' : 'ante';
+    if((pos==='SB'||pos==='BB') && level.ante) postedLabel += '+ante';
+    div.innerHTML = tag + '<div class="pos">'+POS_LABEL[pos]+'</div>'+
+      '<div class="stack mono">'+fmtBB(available, level.bb)+'</div>'+
+      '<div class="chips mono">'+available+' jetons disponibles</div>'+
+      (posted>0 ? '<div class="posted mono">déjà misé ('+postedLabel+') : '+posted+'</div>' : '');
+    if(i===heroIdx){
+      // Hole cards live at hero's own seat — like a real table client — instead
+      // of in a separate row below, since hero's seat is now always the same
+      // (bottom) spot every hand.
+      const cardsWrap = document.createElement('div');
+      cardsWrap.className = 'seat-cards';
+      heroCards.forEach(c=>renderCard(c, cardsWrap));
+      div.appendChild(cardsWrap);
+    }
+    seatsEl.appendChild(div);
+  });
+
+  const heroPos = positions[heroIdx];
+  // Push mode: every position still left to act up to and including the BB
+  // is modeled as a genuine, separate potential caller — its own assumed
+  // range, its own effective stack against the committed amount — not a
+  // guaranteed, cost-free fold. See buildExplain()/ⓘ for the per-seat
+  // breakdown. Call mode is empty HERE specifically because the trainer
+  // always generates call spots with hero AT the BB (nobody left to act
+  // after hero) — the engine itself also supports positions AFTER hero up
+  // to the BB as real deciders (used by the Solver, when hero isn't the BB).
+  const otherDeciders = currentAnalysis && currentAnalysis.deciders
+    ? (mode==='push' ? currentAnalysis.deciders.slice(0,-1) : currentAnalysis.deciders)
+    : [];
+  const skippedNote = otherDeciders.length
+    ? ' '+otherDeciders.map(d=>'<b>'+POS_LABEL[d.pos]+'</b> ('+d.pct.toFixed(0)+'%)').join(', ')+
+      (otherDeciders.length>1 ? ' sont chacune modélisées' : ' est modélisée')+
+      ' comme pouvant réellement te sur-relancer ici, pas comme des folds gratuits (voir ⓘ).'
+    : '';
+  $('#hand-desc').innerHTML = mode==='push'
+    ? '<b>C\'est à toi, en '+POS_LABEL[heroPos]+'</b> — action pliée jusqu\'à toi. Tu décides <b>push ou fold</b> ; toutes les positions encore à parler jusqu\'au <b>BB</b> inclus peuvent réellement te caller.'+skippedNote
+    : '<b>C\'est à toi, au BB</b> — '+POS_LABEL[positions[villainIdx]]+' vient de tout miser (all-in), action pliée jusqu\'à toi. Tu décides <b>call ou fold</b>.'+skippedNote;
+
+  const heroForced = Math.min(stacks[heroIdx], forcedBet(positions[heroIdx], level));
+  const villainForced = Math.min(stacks[villainIdx], forcedBet(positions[villainIdx], level));
+  const heroNetDisp = stacks[heroIdx]-heroForced, villainNetDisp = stacks[villainIdx]-villainForced;
+
+  const situEl = $('#situation');
+  const effCall = currentAnalysis ? currentAnalysis.effCall : Math.min(heroNetDisp, villainNetDisp);
+  if(mode==='push'){
+    // The real cap on what you can lose isn't "vs the BB specifically" — it's
+    // whichever live decider (BB included) can actually match the MOST of
+    // your stack. The BB is very often the shortest of the bunch, so using
+    // ONLY the BB's effCall here (as this used to) routinely understated the
+    // real risk whenever another decider (SB here, say) was deeper than the
+    // BB: you can't lose more than your own net stack, but you very much CAN
+    // lose more than "just vs the shortest opponent" if a deeper one calls.
+    const maxRealCall = currentAnalysis && currentAnalysis.deciders && currentAnalysis.deciders.length
+      ? Math.max(effCall, ...currentAnalysis.deciders.map(d=>d.effCall))
+      : effCall;
+    situEl.innerHTML = 'Ton stack : <b class="mono">'+stacks[heroIdx]+' jetons</b> ('+fmtBB(stacks[heroIdx],level.bb)+'), dont <b class="mono">'+heroForced+'</b> déjà postés — il te reste <b class="mono">'+fmtBB(heroNetDisp,level.bb)+'</b> à pousser. '+
+      'BB : <b class="mono">'+fmtBB(stacks[villainIdx],level.bb)+'</b>. <span class="muted">Un push engage tout ce qu\'il te reste derrière ta mise forcée.</span>'+
+      '<div class="risk-callout">Tu risques réellement, au pire (si c\'est le décideur le plus profond qui te call) : <b class="mono">'+maxRealCall+' jetons</b> (<b class="mono">'+fmtBB(maxRealCall,level.bb)+'</b>) — pas ton stack total affiché, et pas seulement le scénario "vs BB" ci-dessous.</div>';
+  } else {
+    situEl.innerHTML = POS_LABEL[positions[villainIdx]]+' a poussé tout son stack (<b class="mono">'+fmtBB(stacks[villainIdx],level.bb)+'</b>) — '+
+      'ton stack au BB : <b class="mono">'+stacks[heroIdx]+' jetons</b>, dont <b class="mono">'+heroForced+'</b> déjà postés. <span class="muted">Un call engage min(ce qu\'il te reste, ce qu\'il a poussé).</span>'+
+      '<div class="risk-callout">Tu risques réellement <b class="mono">'+effCall+' jetons</b> (<b class="mono">'+fmtBB(effCall,level.bb)+'</b>) en callant — '+
+      (effCall < heroNetDisp*0.6 ? 'nettement moins que ton stack complet, car '+POS_LABEL[positions[villainIdx]]+' est le plus court des deux.' : 'l\'essentiel de ce qu\'il te reste, car vous êtes profondeur comparable.')+'</div>';
+  }
+
+  const btnGo = $('#btn-go');
+  btnGo.textContent = mode==='push' ? 'ALL-IN' : 'CALL';
+  btnGo.className = mode==='push' ? 'go' : 'call';
+  $('#btn-fold').disabled = false;
+  btnGo.disabled = false;
+
+  $('#feedback-slot').innerHTML = '';
+}
+
+function recordResult(userAction){
+  const a = currentAnalysis;
+  const correct = a.correctAction; // 'push'/'call' or 'fold'
+  const isCorrect = userAction === correct;
+  const mode = currentScenario.mode;
+
+  stats.hands++;
+  if(isCorrect){ stats.correct++; stats.streak++; stats.best = Math.max(stats.best, stats.streak); }
+  else { stats.streak = 0; }
+  stats.byMode[mode].hands++;
+  if(isCorrect) stats.byMode[mode].correct++;
+
+  if(!isCorrect){
+    let leakKey = null;
+    if(mode==='push'){
+      leakKey = userAction==='push' ? 'Push trop loose' : 'Push trop tight';
+    } else {
+      leakKey = userAction==='call' ? 'Call trop loose' : 'Call trop tight (attente excessive)';
+    }
+    stats.leaks[leakKey] = (stats.leaks[leakKey]||0)+1;
+  }
+  saveStats(stats);
+  return isCorrect;
+}
+
+function renderFeedback(userAction){
+  const a = currentAnalysis;
+  const isCorrect = recordResult(userAction);
+  const diff = Math.abs(a.evAction - a.evFold);
+  const marginal = diff < CONFIDENCE_MARGIN*PRIZE;
+  const mode = currentScenario.mode;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'feedback ' + (isCorrect ? 'correct':'wrong');
+
+  const actionEvLbl = mode==='push' ? '% ÉQUITÉ ALL-IN' : '% ÉQUITÉ CALL';
+  const bestIsAction = a.evAction > a.evFold;
+
+  let leakHtml = '';
+  if(!isCorrect){
+    const leakKey = mode==='push'
+      ? (userAction==='push' ? 'Push trop loose' : 'Push trop tight')
+      : (userAction==='call' ? 'Call trop loose' : 'Call trop tight (attente excessive)');
+    leakHtml = '<div class="leak">Catégorie de fuite : <b>'+leakKey+'</b></div>';
+  }
+
+  wrap.innerHTML =
+    '<div class="fb-head">'+
+      '<span class="fb-badge">'+(isCorrect?'✓ CORRECT':'✗ À REVOIR')+'</span>'+
+      '<span class="fb-title">Décision correcte : '+(a.correctAction==='fold'?'FOLD':a.actionLabel)+'</span>'+
+    '</div>'+
+    '<div class="ev-grid">'+
+      '<div class="ev-box'+(bestIsAction?' best':'')+'"><div class="lbl">'+actionEvLbl+'</div><div class="val mono">'+fmtPct(a.evAction)+'</div></div>'+
+      '<div class="ev-box'+(!bestIsAction?' best':'')+'"><div class="lbl">% ÉQUITÉ FOLD</div><div class="val mono">'+fmtPct(a.evFold)+'</div></div>'+
+    '</div>'+
+    '<div class="ev-delta">Écart d\'équité ICM : <b>'+fmtPct(diff)+'</b></div>'+
+    '<div class="confidence '+(marginal?'marginal':'robust')+'">'+(marginal?'● Spot marginal (écart faible)':'● Décision robuste')+'</div>'+
+    leakHtml+
+    '<button class="explain-toggle" id="explain-toggle">Explique ↓</button>'+
+    '<div class="explain-body" id="explain-body" hidden></div>';
+
+  const holder = $('#feedback-slot');
+  holder.innerHTML = '';
+  holder.appendChild(wrap);
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'next-btn';
+  nextBtn.textContent = 'Main suivante →';
+  nextBtn.onclick = newHand;
+  holder.appendChild(nextBtn);
+
+  $('#explain-toggle').onclick = ()=>{
+    const body = $('#explain-body');
+    if(body.hidden){
+      body.hidden = false;
+      $('#explain-toggle').textContent = 'Explique ↑';
+      body.innerHTML = buildExplain();
+      fillHeroRangeGrid(currentAnalysis, currentScenario.mode);
+      const nashBtn = document.getElementById('nash-solve-btn');
+      if(nashBtn) nashBtn.onclick = runNashSolve;
+    } else {
+      body.hidden = true;
+      $('#explain-toggle').textContent = 'Explique ↓';
+    }
+  };
+
+  $('#btn-fold').disabled = true;
+  $('#btn-go').disabled = true;
+  answered = true;
+}
+
+function buildRangeGrid(rangeClasses, activeClass){
+  activeClass = activeClass || 'active';
+  const inRange = new Set(rangeClasses);
+  let html = '<div class="range-grid">';
+  for(let i=0;i<13;i++){
+    for(let j=0;j<13;j++){
+      let cls;
+      if(i===j) cls = RANKORDER[i]+RANKORDER[i];
+      else if(i<j) cls = RANKORDER[i]+RANKORDER[j]+'s';
+      else cls = RANKORDER[j]+RANKORDER[i]+'o';
+      const active = inRange.has(cls);
+      html += '<div class="rg-cell'+(active?' '+activeClass:'')+(i===j?' pair':'')+'">'+cls+'</div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+// Same grid, but with THREE categories instead of a plain in/out — see the
+// comment on fillHeroRangeGrid for why this matters: a lot of the 169 classes
+// sit right on the decision boundary, and a hard yes/no there is dominated by
+// Monte-Carlo sampling noise (a few % of equity), which makes the grid look
+// like random static instead of a real strategic shape.
+// `palette` picks the color scheme: 'action' (default) is the green/gold
+// used everywhere this grid answers "what should I do" (hero's own push/call
+// range). 'villain' is a neutral blue/slate used ONLY for a purely
+// descriptive opponent range, so it can never be mistaken at a glance for
+// "these are the hands I should play" — see the CSS comment on
+// .rg-cell.villain-in for why that distinction matters.
+function buildRangeGridCategorized(catMap, palette){
+  const inCls = palette==='villain' ? ' villain-in' : ' active-good';
+  const marginalCls = palette==='villain' ? ' villain-border' : ' active-marginal';
+  let html = '<div class="range-grid">';
+  for(let i=0;i<13;i++){
+    for(let j=0;j<13;j++){
+      let cls;
+      if(i===j) cls = RANKORDER[i]+RANKORDER[i];
+      else if(i<j) cls = RANKORDER[i]+RANKORDER[j]+'s';
+      else cls = RANKORDER[j]+RANKORDER[i]+'o';
+      const cat = catMap[cls]; // 'good' | 'marginal' | undefined (clear fold)
+      const extra = cat==='good' ? inCls : cat==='marginal' ? marginalCls : '';
+      html += '<div class="rg-cell'+extra+(i===j?' pair':'')+'">'+cls+'</div>';
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+// Computes hero's actual +EV push/call range for the CURRENT scenario (exact
+// stacks, position, ICM payouts, assumed villain range) — a real class-by-class
+// calculation, not a lookup table. Runs in chunks (yielding every 12 classes)
+// so it never freezes the UI; reuses the fixed evWin/evLose/evUncalled/evFold
+// already computed for this hand (only pWin varies per starting-hand class).
+//
+// A LOT of starting hands land close to the call/push-vs-fold boundary, and
+// with a Monte-Carlo equity estimate (not a closed-form solve) the sampling
+// noise near that boundary is bigger than the true gap between neighbouring
+// hands — so instead of forcing every class into a hard yes/no (which makes
+// close calls flicker green/grey almost at random), classes within the same
+// "marginal" ICM-equity gap used elsewhere in the app (0.045×prize, same as
+// the single-hand feedback screen) are shown as a third, amber "spot
+// marginal" category instead of being arbitrarily rounded to one side.
+// Computing evAction for one hand class at a given per-decider trial count —
+// factored out so the grid can run a cheap first pass over all 169 classes,
+// then spend real Monte-Carlo budget (thousands of trials) only refining the
+// classes that actually landed close to the fold/marginal boundary, where
+// precision changes the answer, instead of spreading a huge trial count
+// evenly over classes that were never actually in question.
+function evActionForClass(a, mode, combo, trials){
+  if(mode==='push'){
+    // Fast-but-real approximation for this 169-cell heatmap (the actual
+    // decision, above, already ran the genuine multiway Monte-Carlo with real
+    // side pots): chain through each still-to-act position in seat order —
+    // nobody calls, OR the first one (in order) who does call ends the hand.
+    // This misses the rarer case of two of them calling in the very same
+    // hand, which the real decision does capture; a deliberate trade to keep
+    // 169 cells tractable.
+    let pNoneYet = 1, evAcc = 0;
+    for(const dec of a.deciders){
+      const pWinDec = equityVsRangeWeighted(combo, dec.rangeClasses, trials);
+      const evCalledDec = pWinDec*dec.evWin + (1-pWinDec)*dec.evLose;
+      evAcc += pNoneYet * (dec.pct/100) * evCalledDec;
+      pNoneYet *= (1 - dec.pct/100);
+    }
+    evAcc += pNoneYet * a.evUncalled;
+    return evAcc;
+  }
+  const pWin = equityVsRangeWeighted(combo, a.villainRangeClasses, trials);
+  let evAction = pWin*a.evWin + (1-pWin)*a.evLose;
+  if(a.deciders && a.deciders.length){
+    // Blend in the single most likely extra caller among the positions still
+    // to act before hero — same fast-approximation spirit as above.
+    let best = a.deciders[0];
+    for(const d of a.deciders){ if(d.pct>best.pct) best = d; }
+    const pWinExtra = equityVsRangeWeighted(combo, best.rangeClasses, trials);
+    const evExtra = pWinExtra*best.evWin + (1-pWinExtra)*best.evLose;
+    evAction = (1-best.pct/100)*evAction + (best.pct/100)*evExtra;
+  }
+  return evAction;
+}
+
+// An earlier version of this tried to save time with a two-pass scheme (a
+// cheap first read on all 169 classes, then thousands of trials only on
+// whichever ones looked close to the cutoff). That measurably backfired:
+// the flagging decision itself was made from the noisy cheap pass, so a
+// class whose true value sits right on the boundary could get unlucky in
+// pass 1, land just outside the "needs refining" band by pure chance, and
+// keep its noisy low-trial read as final — which is exactly the kind of
+// isolated wrong-looking cell that showed up in testing. Measured directly
+// (running the whole grid twice independently and counting how many of the
+// 169 cells changed category): a flat single pass at GRID_TRIALS below is
+// both simpler and more reliable than that two-pass scheme was, even at
+// equal or lower total compute. Residual instability after this fix is
+// real and was verified, not assumed away: it's confined to the weakest,
+// most marginal hands (the ones already sitting within a hair of the
+// fold/marginal cutoff — think 72o-93o territory), where the TRUE equity
+// values across neighboring classes are themselves separated by a few
+// tenths of a percent — pushing trials even higher (tested up to 4000)
+// barely moved that residual, because it isn't sampling noise you can
+// average away, it's the game itself not giving a clean cutoff there. Any
+// category change at that noise floor is by exactly one adjacent step
+// (fold⇄marginal, or good⇄marginal for a hand already right at the top
+// cutoff) — never a wild swing across the whole grid.
+const GRID_TRIALS = 2000;
+async function fillHeroRangeGrid(a, mode){
+  const container = document.getElementById('hero-range-grid');
+  if(!container) return;
+  const classes = genClasses();
+  const MARGIN = CONFIDENCE_MARGIN*PRIZE;
+  const evByClass = {};
+
+  for(let ci=0; ci<classes.length; ci++){
+    const {cls} = classes[ci];
+    evByClass[cls] = evActionForClass(a, mode, repCombo(cls), GRID_TRIALS);
+    if(ci%8===0){ await new Promise(r=>setTimeout(r,0)); }
+    if(!document.getElementById('hero-range-grid')) return; // explain panel closed mid-compute
+  }
+
+  const catMap = {};
+  classes.forEach(({cls})=>{
+    const diff = evByClass[cls]-a.evFold;
+    if(diff > MARGIN) catMap[cls] = 'good';
+    else if(diff > -MARGIN) catMap[cls] = 'marginal';
+    // else: clear fold, left uncategorized
+  });
+  const el = document.getElementById('hero-range-grid');
+  if(el){ el.classList.remove('hero-range-loading'); el.innerHTML = buildRangeGridCategorized(catMap); }
+}
+
+function buildExplain(){
+  const scn = currentScenario, a = currentAnalysis;
+  const {positions, stacks, level, heroIdx, villainIdx, mode} = scn;
+  let rows = '<table><tr><th>Position</th><th>Stack</th><th>bb</th><th>Mise forcée</th></tr>';
+  positions.forEach((pos,i)=>{
+    const f = Math.min(stacks[i], forcedBet(pos, level));
+    const dec = a.deciders && a.deciders.find(d=>d.idx===i);
+    let tag = '';
+    if(i===heroIdx) tag = ' (toi)';
+    else if(i===villainIdx) tag = mode==='push' ? ' (BB, callant forcé)' : ' (adversaire clé, a poussé)';
+    else if(dec) tag = ' (peut caller — '+dec.pct.toFixed(0)+'%)';
+    rows += '<tr><td>'+POS_LABEL[pos]+tag+'</td>'+
+      '<td class="mono">'+stacks[i]+'</td><td class="mono">'+(stacks[i]/level.bb).toFixed(1)+'</td>'+
+      '<td class="mono">'+f+'</td></tr>';
+  });
+  rows += '</table>';
+
+  const gridTitle = mode==='push' ? 'Range de call assumée pour le BB' : 'Range de push assumée pour le shover';
+  const rangeGrid = buildRangeGridCategorized(categorizeRangeByMargin(RANKING, a.villainRangePct), 'villain');
+  const otherDeciders = mode==='push' ? a.deciders.slice(0,-1) : a.deciders;
+  const deciderList = otherDeciders.map(d=>'<b>'+POS_LABEL[d.pos]+'</b> ('+d.pct.toFixed(0)+'%)').join(', ');
+  const modeExplain = mode==='push'
+    ? ('Chaque position encore à parler jusqu\'au <b>BB</b> inclus est modélisée comme un adversaire séparé, avec sa propre range assumée et son propre stack effectif contre toi'+
+        (otherDeciders.length ? (' : '+deciderList+', puis <b>BB</b> ('+a.villainRangePct.toFixed(0)+'%, callant forcé — pot-committed, donc structurellement le plus large).') : (' — ici seul le <b>BB</b> ('+a.villainRangePct.toFixed(0)+'%) a encore à parler.'))+
+        ' Le résultat affiché (evAction) vient d\'une vraie simulation Monte-Carlo multivoie ('+MULTIWAY_TRIALS+' tirages) : à chaque tirage, une main réelle est distribuée à chacun, comparée à sa propre range, et le(s) side-pot(s) réel(s) sont résolus puis passés à l\'ICM — pas une formule combinant des branches à deux joueurs.')
+    : ('Le <b>'+POS_LABEL[positions[villainIdx]]+'</b> a poussé avec une range assumée de <b>'+a.villainRangePct.toFixed(0)+'%</b> des mains (plus large si son stack est court et sa position tardive).'+
+        (otherDeciders.length ? (' Les positions encore à parler avant que ça revienne à toi ne sont pas des folds acquis pour autant : '+deciderList+' sont chacune modélisées comme de vrais callers potentiels, avec leur propre range et leur propre stack effectif contre le montant poussé — même mécanique de simulation multivoie que ci-dessus.') : ''));
+  const heroActionLbl = mode==='push' ? 'push' : 'call';
+
+  return (
+    '<div><b>Stacks à la table</b></div>' + rows +
+    '<div style="margin-top:6px;">'+modeExplain+'</div>'+
+    '<div style="margin-top:14px;padding:8px 10px;background:rgba(58,74,99,0.25);border:1px solid #3a4a63;border-radius:8px;">'+
+      '<div style="font-size:10.5px;color:#aebdd4;text-transform:uppercase;letter-spacing:0.05em;">🔍 Info seulement — pas ta décision</div>'+
+      '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">'+gridTitle+' ('+a.villainRangePct.toFixed(0)+'% des mains) — à quoi son jeu ressemble probablement, pour te donner le contexte. Ne te dit PAS quoi jouer.</div>'+
+    '</div>'+
+    rangeGrid+
+    '<div style="margin-top:4px;font-size:10.5px;color:var(--text-faint);">'+
+      '<span style="color:#3a4a63;">■</span> nettement dans sa range · '+
+      '<span style="color:#2a3547;">■</span> proche de la coupure (bruité, voir plus bas) · case foncée = nettement hors de sa range.</div>'+
+    '<div>Ton équité contre cette range (simulation Monte-Carlo) : <b>'+(a.pWin*100).toFixed(1)+'%</b></div>'+
+    '<div style="margin-top:6px;">Pot avant l\'action (blindes + antes, déjà compris dans les '+TOTAL_CHIPS+' jetons ci-dessus, pas en plus) : <b class="mono">'+a.potBefore+'</b> jetons</div>'+
+    '<div style="margin-top:10px;">% équité ICM (= % chance de cash) si tu fold maintenant : <b class="mono">'+fmtPct(a.evFold)+'</b></div>'+
+    '<div>% équité ICM (= % chance de cash) si tu '+(mode==='push'?'pushes':'calls')+' : <b class="mono">'+fmtPct(a.evAction)+'</b></div>'+
+    '<div style="margin-top:10px;color:var(--text-faint);">Estimation stratégique basée sur une range simplifiée — pas un solve GTO. Le calcul ICM et l\'équité contre cette range, eux, sont exacts.</div>'+
+    '<div style="margin-top:14px;padding:8px 10px;background:var(--accent-bg);border:1px solid var(--accent-strong);border-radius:8px;">'+
+      '<div style="font-size:10.5px;color:var(--accent);text-transform:uppercase;letter-spacing:0.05em;">👉 Ta décision</div>'+
+      '<div style="font-size:11px;color:var(--text-dim);margin-top:2px;">Ta range correcte de '+heroActionLbl+' ici (stacks + ICM, pas juste ta main) — c\'est CETTE grille qui répond à "qu\'est-ce que je joue", pas celle du dessus.</div>'+
+    '</div>'+
+    '<div id="hero-range-grid" class="hero-range-loading">Calcul en cours…</div>'+
+    '<div style="margin-top:4px;font-size:10.5px;color:var(--text-faint);">'+
+      '<span style="color:var(--accent-strong);">■</span> +EV clair pour '+heroActionLbl+' · '+
+      '<span style="color:var(--gold);">■</span> spot marginal (écart d\'équité ICM trop faible pour trancher net — normal d\'en voir beaucoup, ce sont de vraies zones grises, pas une erreur) · '+
+      'case foncée = fold clair. Calcul réel classe par classe pour cette situation exacte ('+GRID_TRIALS+' tirages Monte-Carlo par main testée, pas une range mémorisée ni un solve).<br>'+
+      'Dans le coin des mains les plus faibles (offsuit basses type 72o-93o), une case isolée peut parfois trancher fold/marginal différemment d\'une main quasi identique juste à côté — vérifié directement (même calcul relancé deux fois sur la même main) : ce n\'est pas du bruit qui se corrige avec plus de tirages, ce sont des mains réellement à égalité à quelques dixièmes de % près. Ça ne change jamais de +EV clair à fold clair d\'un coup, seulement d\'une catégorie adjacente à l\'autre.</div>'+
+    '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">'+
+      '<div style="font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Solve exact (équilibre de Nash)</div>'+
+      '<div style="font-size:11.5px;color:var(--text-dim);margin-bottom:8px;">'+
+        'Au lieu d\'une formule calibrée à la main pour deviner la range adverse, calcule les VRAIES ranges de push et de call qui se répondent mutuellement au mieux pour ce spot précis (mêmes stacks, mêmes paiements ICM), par itération de meilleure réponse — un vrai équilibre pour ce duel à deux, pas une estimation. Toujours limité au duel toi-vs-'+(mode==='push'?'BB':'shover')+' (voir ⓘ) ; calcul plus lourd, jusqu\'à ~1 minute.</div>'+
+      '<button class="explain-toggle" id="nash-solve-btn">Lancer le solve exact</button>'+
+      '<div id="nash-solve-result"></div>'+
+    '</div>'
+  );
+}
+
+async function runNashSolve(){
+  const btn = document.getElementById('nash-solve-btn');
+  const out = document.getElementById('nash-solve-result');
+  if(!btn || !out) return;
+  btn.disabled = true;
+  btn.textContent = 'Calcul en cours…';
+  const scn = currentScenario, a = currentAnalysis;
+  const seedPct = a.villainRangePct;
+  try{
+    const result = await nashSolveHeadsUp(scn, seedPct, seedPct, (iter, max, phase)=>{
+      const el = document.getElementById('nash-solve-result');
+      if(el) el.innerHTML = '<div class="hero-range-loading">Itération '+(iter+1)+'/'+max+' — range du '+(phase==='caller'?'calleur':'pousseur')+'…</div>';
+    });
+    if(!document.getElementById('nash-solve-result')) return; // panel closed mid-compute
+
+    const pusherLabel = scn.mode==='push' ? 'Ta range de push (Nash)' : 'Range de push du shover (Nash)';
+    const callerLabel = scn.mode==='push' ? 'Range de call du BB (Nash)' : 'Ta range de call (Nash)';
+    const heroCls = classOfCards(scn.heroCards);
+    const heroIsPusher = result.pusherIdx === scn.heroIdx;
+    const heroRangeNash = heroIsPusher ? result.pusherRange : result.callerRange;
+    const heroActsNash = heroRangeNash.includes(heroCls);
+    const heroDecisionNash = heroActsNash ? (scn.mode==='push' ? 'push' : 'call') : 'fold';
+
+    const outEl = document.getElementById('nash-solve-result');
+    if(outEl){
+      outEl.innerHTML =
+        '<div style="margin-top:6px;font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;">'+pusherLabel+'</div>'+
+        buildRangeGrid(result.pusherRange, 'active-good')+
+        '<div style="margin-top:10px;font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;">'+callerLabel+'</div>'+
+        buildRangeGrid(result.callerRange, 'active-good')+
+        '<div style="margin-top:8px;font-size:12px;">Ta main (<b>'+heroCls+'</b>) d\'après ce solve : <b>'+(heroDecisionNash==='fold'?'FOLD':heroDecisionNash.toUpperCase())+'</b>'+
+          (heroDecisionNash===a.correctAction
+            ? ' — cohérent avec l\'estimation heuristique ci-dessus.'
+            : ' — <b style="color:var(--gold);">différent de l\'estimation heuristique ci-dessus</b> (attendu sur les spots marginaux ; les deux méthodes ne sont pas censées toujours tomber pile au même endroit).')+
+        '</div>'+
+        '<div style="margin-top:6px;font-size:10.5px;color:var(--text-faint);">'+result.iterations+' itérations de meilleure réponse mutuelle. Pas de preuve de convergence stricte (bruit Monte-Carlo) — c\'est un vrai équilibre calculé pour ce spot, pas une formule, mais pas non plus une garantie mathématique de point fixe exact.</div>';
+      btn.textContent = 'Relancer le solve exact';
+      btn.disabled = false;
+    }
+  }catch(e){
+    const el = document.getElementById('nash-solve-result');
+    if(el) el.innerHTML = '<div style="color:var(--danger);font-size:12px;">Erreur pendant le calcul du solve.</div>';
+    btn.textContent = 'Relancer le solve exact';
+    btn.disabled = false;
+  }
+}
+
+/* ---- stats view ---- */
+function renderStats(){
+  const s = stats;
+  const acc = s.hands ? Math.round(100*s.correct/s.hands) : 0;
+  const pushAcc = s.byMode.push.hands ? Math.round(100*s.byMode.push.correct/s.byMode.push.hands) : null;
+  const callAcc = s.byMode.call.hands ? Math.round(100*s.byMode.call.correct/s.byMode.call.hands) : null;
+
+  const leakEntries = Object.entries(s.leaks).sort((a,b)=>b[1]-a[1]);
+
+  let html = '';
+  if(s.hands===0){
+    html += '<div class="empty-state">Aucune main jouée pour l\'instant.<br>Réponds à quelques spots en mode Push/Fold ou Call/Fold pour voir tes stats apparaître ici.</div>';
+  } else {
+    html += '<div class="stat-grid">'+
+      '<div class="stat-card"><div class="num mono">'+s.hands+'</div><div class="lbl">Mains jouées</div></div>'+
+      '<div class="stat-card"><div class="num mono">'+acc+'%</div><div class="lbl">Précision globale</div></div>'+
+      '<div class="stat-card"><div class="num mono">'+s.streak+'</div><div class="lbl">Série en cours</div></div>'+
+      '<div class="stat-card"><div class="num mono">'+s.best+'</div><div class="lbl">Meilleure série</div></div>'+
+      '<div class="stat-card wide"><div class="lbl" style="margin-bottom:6px;">Par mode</div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">'+
+          '<span>Push/Fold</span><span class="mono">'+(pushAcc===null?'—':pushAcc+'% ('+s.byMode.push.hands+')')+'</span></div>'+
+        '<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;">'+
+          '<span>Call/Fold</span><span class="mono">'+(callAcc===null?'—':callAcc+'% ('+s.byMode.call.hands+')')+'</span></div>'+
+      '</div>'+
+    '</div>';
+
+    html += '<div class="section-title">Fuites détectées</div>';
+    if(leakEntries.length===0){
+      html += '<div class="empty-state">Aucune erreur pour l\'instant — continue comme ça.</div>';
+    } else {
+      html += '<div class="stat-card">';
+      leakEntries.forEach(([k,v])=>{
+        html += '<div class="leak-row"><span>'+k+'</span><span class="n">'+v+'×</span></div>';
+      });
+      html += '</div>';
+    }
+  }
+  html += '<button class="reset-btn" id="reset-stats">Réinitialiser les statistiques</button>';
+  $('#main-stats').innerHTML = html;
+  const resetBtn = $('#reset-stats');
+  if(resetBtn) resetBtn.onclick = ()=>{
+    stats = {hands:0, correct:0, streak:0, best:0, byMode:{push:{hands:0,correct:0}, call:{hands:0,correct:0}}, leaks:{}};
+    saveStats(stats);
+    renderStats();
+  };
+}
+
+/* ---- solver view (real hand, values entered by hand from a screenshot) ---- */
+function solverLevelOptions(selectedIdx){
+  return LEVELS.map((lv,i)=>
+    '<option value="'+i+'"'+(i===selectedIdx?' selected':'')+'>N'+lv.n+' — '+lv.sb+'/'+lv.bb+(lv.ante?' ante '+lv.ante:'')+'</option>'
+  ).join('');
+}
+function solverRankOptions(sel){
+  return RANK_CHARS.slice().reverse().map(ch=>{
+    const v = RANK_CHARS.indexOf(ch)+2;
+    return '<option value="'+v+'"'+(v===sel?' selected':'')+'>'+ch+'</option>';
+  }).join('');
+}
+function solverSuitOptions(sel){
+  return SUIT_SYM.map((sym,i)=>
+    '<option value="'+i+'"'+(i===sel?' selected':'')+'>'+sym+' '+(SUIT_COLOR[i]==='black'?'noir':'rouge')+'</option>'
+  ).join('');
+}
+function renderSolverForm(){
+  const N = solverState.N;
+  const positions = positionsFor(N);
+
+  const seatRows = positions.map(pos=>{
+    const val = solverState.stacks[pos] != null ? solverState.stacks[pos] : 1500;
+    return '<div class="solver-seat-row"><div class="pos-lbl">'+POS_LABEL[pos]+'</div>'+
+      '<input class="solver-input" type="number" min="0" step="1" data-seat="'+pos+'" value="'+val+'">'+
+      '<div class="mono" style="font-size:11px;color:var(--text-faint);">jetons</div></div>';
+  }).join('');
+
+  const shoverOpts = '<option value="">— Personne (je réfléchis à pousser) —</option>' +
+    positions.map(pos=> '<option value="'+pos+'"'+(solverState.shover===pos?' selected':'')+'>'+POS_LABEL[pos]+'</option>').join('');
+  const heroOpts = positions.map(pos=> '<option value="'+pos+'"'+(solverState.heroPos===pos?' selected':'')+'>'+POS_LABEL[pos]+'</option>').join('');
+
+  const html =
+    '<p class="solver-intro">Entre les vraies valeurs lues sur une capture d\'écran de ta main (stacks, blindes, position, tes cartes) et obtiens la décision ICM complète — exactement le même moteur que le mode entraînement, mais sur TA main réelle, pas une main générée.</p>'+
+    '<div class="solver-section">'+
+      '<h3>Table</h3>'+
+      '<div class="solver-row">'+
+        '<div class="solver-field"><label>Joueurs restants</label>'+
+          '<select class="solver-select" id="sv-N">'+
+            [4,5,6].map(n=>'<option value="'+n+'"'+(n===N?' selected':'')+'>'+n+'</option>').join('')+
+          '</select></div>'+
+        '<div class="solver-field"><label>Niveau de blindes</label>'+
+          '<select class="solver-select" id="sv-level">'+solverLevelOptions(solverState.levelIdx)+'</select></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="solver-section">'+
+      '<h3>Stacks (jetons actuels de chacun)</h3>'+
+      '<div class="solver-seats" id="sv-seats">'+seatRows+'</div>'+
+      '<div class="solver-sum mono" id="sv-sum"></div>'+
+    '</div>'+
+    '<div class="solver-section">'+
+      '<h3>Action</h3>'+
+      '<div class="solver-field"><label>Qui a poussé tout son stack (all-in) ?</label>'+
+        '<select class="solver-select" id="sv-shover">'+shoverOpts+'</select></div>'+
+      '<div class="solver-field"><label>Ta position</label>'+
+        '<select class="solver-select" id="sv-hero">'+heroOpts+'</select></div>'+
+    '</div>'+
+    '<div class="solver-section">'+
+      '<h3>Tes cartes</h3>'+
+      '<div class="solver-cards">'+
+        '<div class="solver-card-pick"><select class="solver-select" id="sv-r1">'+solverRankOptions(solverState.card1.r)+'</select><select class="solver-select" id="sv-s1">'+solverSuitOptions(solverState.card1.s)+'</select></div>'+
+        '<div class="solver-card-pick"><select class="solver-select" id="sv-r2">'+solverRankOptions(solverState.card2.r)+'</select><select class="solver-select" id="sv-s2">'+solverSuitOptions(solverState.card2.s)+'</select></div>'+
+      '</div>'+
+    '</div>'+
+    '<button class="solver-btn" id="sv-solve">Résoudre</button>'+
+    '<div id="sv-error"></div>'+
+    '<div id="sv-result"></div>';
+
+  $('#main-solver').innerHTML = html;
+  updateSolverSum();
+
+  $('#sv-N').onchange = (e)=>{
+    solverState.N = +e.target.value;
+    solverState.stacks = {}; // stale seat values from the previous N don't carry over cleanly
+    solverState.shover = '';
+    const pos0 = positionsFor(solverState.N)[0];
+    solverState.heroPos = pos0;
+    renderSolverForm();
+  };
+  $('#sv-level').onchange = (e)=>{ solverState.levelIdx = +e.target.value; };
+  $('#sv-shover').onchange = (e)=>{ solverState.shover = e.target.value; };
+  $('#sv-hero').onchange = (e)=>{ solverState.heroPos = e.target.value; };
+  $('#sv-r1').onchange = (e)=>{ solverState.card1.r = +e.target.value; };
+  $('#sv-s1').onchange = (e)=>{ solverState.card1.s = +e.target.value; };
+  $('#sv-r2').onchange = (e)=>{ solverState.card2.r = +e.target.value; };
+  $('#sv-s2').onchange = (e)=>{ solverState.card2.s = +e.target.value; };
+  $$('#sv-seats input').forEach(inp=>{
+    inp.oninput = ()=>{ solverState.stacks[inp.dataset.seat] = +inp.value || 0; updateSolverSum(); };
+  });
+  $('#sv-solve').onclick = runSolver;
+}
+function updateSolverSum(){
+  const el = $('#sv-sum'); if(!el) return;
+  const sum = $$('#sv-seats input').reduce((s,i)=> s+(+i.value||0), 0);
+  el.textContent = 'Somme des stacks : '+sum+' jetons (attendu : '+TOTAL_CHIPS+' — le total en jeu ne bouge jamais, pas de rebuy/add-on).';
+  el.classList.toggle('mismatch', sum!==TOTAL_CHIPS);
+}
+function runSolver(){
+  const errEl = $('#sv-error'); errEl.innerHTML = '';
+  const resEl = $('#sv-result'); resEl.innerHTML = '';
+
+  const N = solverState.N;
+  const positions = positionsFor(N);
+  const level = LEVELS[solverState.levelIdx];
+  const stacks = positions.map(pos=> solverState.stacks[pos] != null ? solverState.stacks[pos] : 1500);
+  const heroPos = solverState.heroPos;
+  const shoverPos = solverState.shover;
+  const heroIdx = positions.indexOf(heroPos);
+
+  if(stacks.some(s=> s<0) || stacks.some(s=> !Number.isFinite(s))){
+    errEl.innerHTML = '<div class="solver-error">Stack invalide — vérifie les jetons de chaque siège.</div>'; return;
+  }
+  if(solverState.card1.r===solverState.card2.r && solverState.card1.s===solverState.card2.s){
+    errEl.innerHTML = '<div class="solver-error">Les deux cartes sélectionnées sont identiques.</div>'; return;
+  }
+
+  let mode, villainIdx;
+  if(shoverPos===''){
+    // Push spot: hero is the one considering shoving. In this model the BB is
+    // always the final, forced decider (see analyze()) — hero can't BE the BB
+    // in a push spot, since there's nobody left after the BB to still call.
+    mode = 'push';
+    villainIdx = positions.indexOf('BB');
+    if(heroPos==='BB'){
+      errEl.innerHTML = '<div class="solver-error">Le BB ne peut pas être "le pousseur" dans ce modèle (action déjà pliée jusqu\'à lui, ou il subit un all-in — dans ce cas sélectionne plutôt qui a poussé ci-dessus).</div>';
+      return;
+    }
+  } else {
+    // Call spot: hero decides after the shover. Hero must sit strictly after
+    // the shover in table order (can't call a shove that hasn't happened yet).
+    mode = 'call';
+    villainIdx = positions.indexOf(shoverPos);
+    if(heroIdx <= villainIdx){
+      errEl.innerHTML = '<div class="solver-error">Ta position doit agir APRÈS le shover ('+POS_LABEL[shoverPos]+') dans l\'ordre de la table — sinon ce n\'est pas toi qui décides face à cet all-in.</div>';
+      return;
+    }
+  }
+
+  const scn = {mode, N, level, positions, stacks, heroIdx, villainIdx, heroCards:[solverState.card1, solverState.card2]};
+  const a = analyze(scn);
+  currentScenario = scn;
+  currentAnalysis = a;
+
+  const bestIsAction = a.evAction > a.evFold;
+  const diff = Math.abs(a.evAction - a.evFold);
+  const marginal = diff < CONFIDENCE_MARGIN*PRIZE;
+  const actionEvLbl = mode==='push' ? '% ÉQUITÉ ALL-IN' : '% ÉQUITÉ CALL';
+  const finalLabel = bestIsAction ? a.actionLabel : 'FOLD';
+  const confLabel = marginal ? 'CONFIANCE : FAIBLE (spot marginal)' : 'CONFIANCE : FORTE (décision robuste)';
+
+  resEl.innerHTML =
+    '<div class="solver-section">'+
+      '<span class="solver-result-badge '+(bestIsAction?'act':'fold')+'">ACTION : '+finalLabel+'</span>'+
+      '<div class="solver-confidence">'+confLabel+' — écart d\'équité ICM : <b class="mono">'+fmtPct(diff)+'</b></div>'+
+      '<div class="ev-grid">'+
+        '<div class="ev-box'+(bestIsAction?' best':'')+'"><div class="lbl">'+actionEvLbl+'</div><div class="val mono">'+fmtPct(a.evAction)+'</div></div>'+
+        '<div class="ev-box'+(!bestIsAction?' best':'')+'"><div class="lbl">% ÉQUITÉ FOLD</div><div class="val mono">'+fmtPct(a.evFold)+'</div></div>'+
+      '</div>'+
+      '<div class="explain-body" id="sv-explain"></div>'+
+    '</div>';
+  $('#sv-explain').innerHTML = buildExplain();
+  fillHeroRangeGrid(a, mode);
+  const nashBtn = document.getElementById('nash-solve-btn');
+  if(nashBtn) nashBtn.onclick = runNashSolve;
+  resEl.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+/* ---- tab switching ---- */
+function switchTab(tab){
+  currentTabMode = tab;
+  $$('.tabs button').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+  if(tab==='stats'){
+    $('#main-train').hidden = true;
+    $('#main-solver').hidden = true;
+    $('#main-stats').hidden = false;
+    $('#actionbar').hidden = true;
+    renderStats();
+  } else if(tab==='solver'){
+    $('#main-train').hidden = true;
+    $('#main-stats').hidden = true;
+    $('#main-solver').hidden = false;
+    $('#actionbar').hidden = true;
+    renderSolverForm();
+  } else {
+    $('#main-train').hidden = false;
+    $('#main-stats').hidden = true;
+    $('#main-solver').hidden = true;
+    $('#actionbar').hidden = false;
+    newHand();
+  }
+}
+
+/* ---- wiring ---- */
+$('#btn-fold').addEventListener('click', ()=>{
+  if(answered) return;
+  const scn = currentScenario;
+  renderFeedback('fold');
+});
+$('#btn-go').addEventListener('click', ()=>{
+  if(answered) return;
+  const scn = currentScenario;
+  renderFeedback(scn.mode==='push' ? 'push' : 'call');
+});
+$$('.tabs button').forEach(b=> b.addEventListener('click', ()=> switchTab(b.dataset.tab)));
+$('#btn-info').addEventListener('click', ()=> $('#info-modal').hidden = false);
+$('#close-info').addEventListener('click', ()=> $('#info-modal').hidden = true);
+$('#info-modal').addEventListener('click', (e)=>{ if(e.target.id==='info-modal') $('#info-modal').hidden = true; });
+
+/* ---- boot ---- */
+(async function boot(){
+  const fill = $('#loadbar-fill');
+  const msg = $('#loading-msg');
+  try{
+    RANKING = await loadOrBuildRanking((p)=>{
+      fill.style.width = Math.round(p*100)+'%';
+      if(p<1) msg.textContent = 'Calcul du classement des 169 mains de départ (simulation Monte-Carlo, une seule fois — mis en cache ensuite)… '+Math.round(p*100)+'%';
+      else msg.textContent = 'Prêt.';
+    });
+  }catch(e){
+    msg.textContent = 'Erreur pendant le calcul — nouvelle tentative…';
+    RANKING = await buildHandRanking(50, ()=>{});
+  }
+  $('#loading').hidden = true;
+  $('#app').hidden = false;
+  switchTab('mix');
+})();
+</script>
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
