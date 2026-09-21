@@ -1,6 +1,6 @@
 // Bump this version string every time index.html (or any cached asset) changes,
 // so installed devices pick up the update instead of serving a stale cache forever.
-const CACHE_NAME = 'icm-don-trainer-v3';
+const CACHE_NAME = 'icm-don-trainer-v5';
 const ASSETS = [
   './',
   './index.html',

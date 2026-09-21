@@ -8,7 +8,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ICM DoN">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Entraineur ICM push/fold et call/fold pour Double or Nothing 6-max">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="icon-192.png" type="image/png">
@@ -82,19 +81,32 @@ button{font-family:inherit;}
 @media (min-width:860px){
   #app{max-width:1180px;}
   #main-train{
-    display:grid;
-    grid-template-columns:1.15fr 0.9fr;
-    grid-template-areas:
-      "info info"
-      "table context"
-      "table feedback";
+    display:flex;
+    flex-wrap:wrap;
+    align-items:flex-start;
     column-gap:22px;
-    align-items:start;
   }
-  #main-train .infobar{grid-area:info;}
-  #main-train .table-wrap{grid-area:table;margin-bottom:0;aspect-ratio:1/0.92;}
-  #main-train .table-context{grid-area:context;margin-bottom:0;}
-  #main-train #feedback-slot{grid-area:feedback;}
+  /* Each side is its own independent flex column — the right side's height
+     (context + feedback) never depends on the table's height, unlike a CSS
+     Grid row would (that's what caused the earlier bug: the feedback box
+     ended up shoved far down the page, below the tall table, because grid
+     rows size to the tallest item sharing that row across BOTH columns). */
+  #main-train{align-items:flex-start;height:100%;}
+  #main-train .infobar{flex:1 0 100%;}
+  /* Sized by AVAILABLE HEIGHT (clamp of the viewport height), not by
+     available width like before — sizing it from width let it grow taller
+     than the screen on a wide window (aspect-ratio then makes height follow
+     width), which is exactly what forced the whole page to scroll. Width is
+     now the dependent dimension (derived from height via aspect-ratio). */
+  #main-train .table-wrap{
+    flex:0 1 auto;width:auto;margin-bottom:0;aspect-ratio:1/0.92;
+    height:clamp(300px, 68vh, 620px);
+  }
+  #main-train .side-col{
+    flex:1 1 0;min-width:0;display:flex;flex-direction:column;gap:10px;
+    height:clamp(300px, 68vh, 620px);overflow-y:auto;
+  }
+  #main-train .table-context{margin-bottom:0;}
 }
 [hidden]{display:none!important;}
 
@@ -126,7 +138,18 @@ nav.tabs button{
 }
 nav.tabs button.active{background:var(--accent-bg);border-color:var(--accent-strong);color:var(--accent);}
 
-main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px);}
+/* min-height:0 is load-bearing here, not decorative: a flex child's default
+   min-height is `auto`, which means "never shrink below your content's
+   natural height" — so without this, `main` ignored its flex:1 1 auto and
+   overflow-y:auto entirely and just grew as tall as its content needed,
+   pushing the actionbar (and on desktop, part of the header/nav) off the
+   BOTTOM of the viewport, which is what produced the full-page scrollbar
+   with the header cut off at the top. With min-height:0, main is forced to
+   stay within its allotted flex space, and ONLY main scrolls internally
+   (header/nav/actionbar always stay pinned, visible, in place) — and on
+   desktop (see the table-wrap height clamp below) it usually doesn't even
+   need to. */
+main{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(env(safe-area-inset-bottom,0px) + 10px);}
 
 /* ---------- scenario card ---------- */
 .infobar{
@@ -140,7 +163,24 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
 }
 .pill.n{color:var(--gold);border-color:rgba(227,185,92,0.35);background:var(--gold-bg);}
 
-.table-wrap{position:relative;width:100%;aspect-ratio:1/0.78;margin:0 0 10px;}
+.table-wrap{position:relative;width:100%;aspect-ratio:1/0.68;margin:0 0 8px;}
+/* Once feedback is showing (an answer was just given), the table itself is
+   no longer the thing to read — the result/explanation is — so on the
+   single-column MOBILE layout it shrinks further to make room, instead of
+   needing to scroll to reach the feedback and the Next button. Scoped to
+   under the desktop breakpoint only: on desktop the table's size is driven
+   by height (see the @media (min-width:860px) block), and letting this rule
+   apply there too fights that — a smaller aspect-ratio fraction at a FIXED
+   height means a much WIDER table, which is exactly what squeezed the right
+   column down to almost nothing (a real bug this shipped with briefly). */
+@media (max-width:859px){
+  main:has(#feedback-slot .feedback) .table-wrap{aspect-ratio:1/0.56;}
+  /* The pot-center text (level/blinds/N players) is already shown in the
+     pills above the table — hiding the redundant copy here, once an answer
+     is given and the table has shrunk, is what avoids it visually colliding
+     with the seats/hero-cards on top of it in a short table. */
+  main:has(#feedback-slot .feedback) #pot-center{display:none;}
+}
 .felt{
   position:absolute;left:8%;right:8%;top:9%;bottom:9%;border-radius:50%;
   background:radial-gradient(ellipse at 50% 32%, #1f6a4b 0%, #124030 62%, #0d3226 100%);
@@ -192,8 +232,8 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
 .seat-cards .card .s{font-size:9.5px;margin-top:0;}
 
 .table-context{
-  background:var(--surface);border:1px solid var(--border);border-radius:13px;
-  padding:10px 12px;margin-bottom:10px;display:flex;flex-direction:column;gap:8px;
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:7px 10px;margin-bottom:8px;display:flex;flex-direction:column;gap:5px;
 }
 .hand-row{display:flex;align-items:center;gap:14px;}
 .cards{display:flex;gap:6px;}
@@ -207,17 +247,17 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
 .card .s{font-size:17px;line-height:1;margin-top:1px;}
 .card.black .r,.card.black .s{color:var(--card-black);}
 .card.red .r,.card.red .s{color:var(--card-red);}
-.hand-desc{font-size:13px;color:var(--text-dim);line-height:1.45;flex:1;}
+.hand-desc{font-size:12px;color:var(--text-dim);line-height:1.35;flex:1;}
 .hand-desc b{color:var(--text);}
 
 .situation{
-  font-size:12.5px;line-height:1.45;color:var(--text);
-  background:var(--surface-2);border-radius:9px;padding:8px 10px;
+  font-size:11.5px;line-height:1.35;color:var(--text);
+  background:var(--surface-2);border-radius:9px;padding:7px 9px;
 }
 .situation .muted{color:var(--text-dim);}
 .risk-callout{
-  margin-top:6px;padding:6px 9px;border-radius:8px;background:var(--gold-bg);
-  border:1px solid rgba(227,185,92,0.3);color:var(--text);font-size:11.5px;
+  margin-top:5px;padding:5px 8px;border-radius:8px;background:var(--gold-bg);
+  border:1px solid rgba(227,185,92,0.3);color:var(--text);font-size:10.5px;
 }
 
 /* ---------- action bar ---------- */
@@ -239,34 +279,34 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
 
 /* ---------- feedback ---------- */
 .feedback{
-  border-radius:13px;padding:11px;margin-bottom:10px;border:1px solid var(--border);background:var(--surface);
+  border-radius:12px;padding:8px 9px;margin-bottom:8px;border:1px solid var(--border);background:var(--surface);
 }
 .feedback.correct{border-color:var(--accent-strong);}
 .feedback.wrong{border-color:var(--danger);}
-.fb-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.fb-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
 .fb-badge{
-  font-family:var(--font-display);font-weight:800;font-size:12px;padding:5px 10px;border-radius:99px;
+  font-family:var(--font-display);font-weight:800;font-size:11px;padding:4px 9px;border-radius:99px;
 }
 .feedback.correct .fb-badge{background:var(--accent-bg);color:var(--accent);}
 .feedback.wrong .fb-badge{background:var(--danger-bg);color:var(--danger);}
-.fb-title{font-size:14.5px;font-weight:700;}
-.ev-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
-.ev-box{background:var(--surface-2);border-radius:10px;padding:9px 11px;}
-.ev-box .lbl{font-size:10.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;}
-.ev-box .val{font-family:var(--font-mono);font-size:17px;font-weight:600;margin-top:2px;}
+.fb-title{font-size:13px;font-weight:700;}
+.ev-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;}
+.ev-box{background:var(--surface-2);border-radius:9px;padding:6px 9px;}
+.ev-box .lbl{font-size:9.5px;color:var(--text-faint);text-transform:uppercase;letter-spacing:0.05em;}
+.ev-box .val{font-family:var(--font-mono);font-size:15px;font-weight:600;margin-top:1px;}
 .ev-box.best{outline:2px solid var(--accent-strong);outline-offset:-1px;}
-.ev-delta{font-size:12px;color:var(--text-dim);margin-bottom:10px;}
+.ev-delta{font-size:11px;color:var(--text-dim);margin-bottom:6px;}
 .ev-delta b{color:var(--text);}
 .confidence{
-  display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:4px 9px;border-radius:99px;
-  background:var(--surface-2);color:var(--text-dim);margin-bottom:10px;
+  display:inline-flex;align-items:center;gap:5px;font-size:10px;padding:3px 8px;border-radius:99px;
+  background:var(--surface-2);color:var(--text-dim);margin-bottom:6px;
 }
 .confidence.robust{color:var(--accent);}
 .confidence.marginal{color:var(--gold);}
-.leak{font-size:12.5px;color:var(--danger);background:var(--danger-bg);border-radius:9px;padding:7px 10px;margin-bottom:10px;}
+.leak{font-size:11.5px;color:var(--danger);background:var(--danger-bg);border-radius:9px;padding:5px 9px;margin-bottom:6px;}
 .explain-toggle{
   background:none;border:1px solid var(--border);color:var(--text-dim);border-radius:9px;
-  padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;width:100%;
+  padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;width:100%;
 }
 .explain-body{margin-top:10px;font-size:12.5px;color:var(--text-dim);line-height:1.6;}
 .explain-body table{width:100%;border-collapse:collapse;font-size:11.5px;margin:8px 0;}
@@ -301,8 +341,8 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
   padding:10px;margin:8px 0;text-align:center;
 }
 .next-btn{
-  width:100%;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#06130e;
-  font-family:var(--font-display);font-weight:800;font-size:15px;cursor:pointer;margin-bottom:16px;
+  width:100%;padding:11px;border-radius:13px;border:none;background:var(--accent);color:#06130e;
+  font-family:var(--font-display);font-weight:800;font-size:14px;cursor:pointer;margin-bottom:8px;
 }
 .next-btn:active{transform:scale(0.98);}
 
@@ -418,14 +458,16 @@ main{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px
       <div id="seats"></div>
     </div>
 
-    <div class="table-context">
-      <div class="hand-row">
-        <div class="hand-desc" id="hand-desc"></div>
+    <div class="side-col">
+      <div class="table-context">
+        <div class="hand-row">
+          <div class="hand-desc" id="hand-desc"></div>
+        </div>
+        <div class="situation" id="situation"></div>
       </div>
-      <div class="situation" id="situation"></div>
-    </div>
 
-    <div id="feedback-slot"></div>
+      <div id="feedback-slot"></div>
+    </div>
   </main>
 
   <main id="main-stats" hidden></main>
